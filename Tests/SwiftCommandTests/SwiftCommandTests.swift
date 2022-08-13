@@ -60,4 +60,14 @@ final class SwiftCommandTests: XCTestCase {
             }
         }
     }
+    
+    func testStderr() async throws {
+        let output = try await Command.findInPath(withName: "cat")!
+                                      .addArgument("non_existing.txt")
+                                      .setStderr(.pipe)
+                                      .output
+        
+        XCTAssertNotEqual(output.status, .success)
+        XCTAssertEqual(output.stderr, "cat: non_existing.txt: No such file or directory\n")
+    }
 }

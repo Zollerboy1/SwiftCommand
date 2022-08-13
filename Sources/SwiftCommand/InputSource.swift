@@ -1,7 +1,7 @@
 import Foundation
-import SystemPackage
+@preconcurrency import SystemPackage
 
-public protocol InputSource {
+public protocol InputSource: Equatable, Sendable {
     var processInput: Either<FileHandle?, Pipe> { get throws }
 }
 
@@ -54,6 +54,10 @@ public struct PipeFromInputSource: InputSource {
 
     public var processInput: Either<FileHandle?, Pipe> {
         .second(self.pipe)
+    }
+    
+    public static func ==(lhs: Self, rhs: Self) -> Bool {
+        lhs.pipe === rhs.pipe
     }
 }
 

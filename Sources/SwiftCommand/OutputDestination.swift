@@ -1,7 +1,7 @@
 import Foundation
-import SystemPackage
+@preconcurrency import SystemPackage
 
-public protocol OutputDestination {
+public protocol OutputDestination: Equatable, Sendable {
     var processOutput: Either<FileHandle?, Pipe> { get throws }
 }
 
