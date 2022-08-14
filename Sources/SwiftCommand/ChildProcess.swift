@@ -39,25 +39,30 @@ public final class ChildProcess<Stdin: InputSource, Stdout: OutputDestination, S
     }
 
     public struct OutputHandle {
-        @available(macOS 12.0, *)
         public struct AsyncCharacters: AsyncSequence { // Should be replaced by 'some AsyncSequence<Character>' as soon as that is available.
+            @usableFromInline
+            internal typealias Base =
+                AsyncCharacterSequence<FileHandle.CustomAsyncBytes>
+            
             public typealias Element = Character
 
             public struct AsyncIterator: AsyncIteratorProtocol {
-                private var base: AsyncCharacterSequence<FileHandle.AsyncBytes>.AsyncIterator
+                @usableFromInline
+                internal var _base: Base.AsyncIterator
 
-                fileprivate init(_base base: AsyncCharacterSequence<FileHandle.AsyncBytes>.AsyncIterator) {
-                    self.base = base
+                fileprivate init(_base: Base.AsyncIterator) {
+                    self._base = _base
                 }
 
+                @inlinable
                 public mutating func next() async throws -> Character? {
-                    try await self.base.next()
+                    try await self._base.next()
                 }
             }
 
-            private let base: AsyncCharacterSequence<FileHandle.AsyncBytes>
+            private let base: Base
 
-            fileprivate init(_base base: AsyncCharacterSequence<FileHandle.AsyncBytes>) {
+            fileprivate init(_base base: Base) {
                 self.base = base
             }
 
@@ -66,25 +71,30 @@ public final class ChildProcess<Stdin: InputSource, Stdout: OutputDestination, S
             }
         }
 
-        @available(macOS 12.0, *)
         public struct AsyncLines: AsyncSequence { // Should be replaced by 'some AsyncSequence<String>' as soon as that is available.
+            @usableFromInline
+            internal typealias Base =
+                AsyncLineSequence<FileHandle.CustomAsyncBytes>
+            
             public typealias Element = String
 
             public struct AsyncIterator: AsyncIteratorProtocol {
-                private var base: AsyncLineSequence<FileHandle.AsyncBytes>.AsyncIterator
+                @usableFromInline
+                internal var _base: Base.AsyncIterator
 
-                fileprivate init(_base base: AsyncLineSequence<FileHandle.AsyncBytes>.AsyncIterator) {
-                    self.base = base
+                fileprivate init(_base: Base.AsyncIterator) {
+                    self._base = _base
                 }
 
+                @inlinable
                 public mutating func next() async throws -> String? {
-                    try await self.base.next()
+                    try await self._base.next()
                 }
             }
 
-            private let base: AsyncLineSequence<FileHandle.AsyncBytes>
+            private let base: Base
 
-            fileprivate init(_base base: AsyncLineSequence<FileHandle.AsyncBytes>) {
+            fileprivate init(_base base: Base) {
                 self.base = base
             }
 
@@ -123,12 +133,10 @@ public final class ChildProcess<Stdin: InputSource, Stdout: OutputDestination, S
         }
 
 
-        @available(macOS 12.0, *)
         public var characters: AsyncCharacters {
             .init(_base: self.pipe.fileHandleForReading.bytes.characters)
         }
 
-        @available(macOS 12.0, *)
         public var lines: AsyncLines {
             .init(_base: self.pipe.fileHandleForReading.bytes.lines)
         }
@@ -173,6 +181,9 @@ public final class ChildProcess<Stdin: InputSource, Stdout: OutputDestination, S
         case is PipeInputSource:
             stdinPipe = Pipe()
             process.standardInput = stdinPipe
+        case let pipeFromSource as PipeFromInputSource:
+            stdinPipe = pipeFromSource.pipe
+            process.standardInput = pipeFromSource.pipe
         case let stdin:
             stdinPipe = nil
             switch try stdin.processInput {
@@ -248,8 +259,12 @@ public final class ChildProcess<Stdin: InputSource, Stdout: OutputDestination, S
     public func terminate() {
         self.process.terminate()
     }
+    
 
+    @discardableResult
     public func wait() throws -> ExitStatus {
+        try self.closePipedStdin()
+        
         self.process.waitUntilExit()
 
         return try self.createExitStatus().get()
@@ -257,7 +272,9 @@ public final class ChildProcess<Stdin: InputSource, Stdout: OutputDestination, S
 
     public var status: ExitStatus {
         get async throws {
-            try await withCheckedThrowingContinuation { continuation in
+            try self.closePipedStdin()
+            
+            return try await withCheckedThrowingContinuation { continuation in
                 if self.process.isRunning {
                     self.process.terminationHandler = { [weak self] _ in
                         if let self {
@@ -289,6 +306,13 @@ public final class ChildProcess<Stdin: InputSource, Stdout: OutputDestination, S
             return .failure(Error.unknownTerminationReason)
         }
     }
+    
+    private func closePipedStdin() throws {
+        if Stdin.self == PipeInputSource.self
+            || Stdin.self == PipeFromInputSource.self {
+            try self.stdinPipe!.fileHandleForWriting.close()
+        }
+    }
 }
 
 extension ChildProcess where Stdin == PipeInputSource {
@@ -304,6 +328,8 @@ extension ChildProcess where Stdout == PipeOutputDestination {
 
 
     public func waitWithOutput() throws -> ProcessOutput {
+        try self.closePipedStdin()
+        
         self.process.waitUntilExit()
 
         return try self.createProcessOutput().get()
@@ -311,7 +337,9 @@ extension ChildProcess where Stdout == PipeOutputDestination {
 
     public var output: ProcessOutput {
         get async throws {
-            try await withCheckedThrowingContinuation { continuation in
+            try self.closePipedStdin()
+            
+            return try await withCheckedThrowingContinuation { continuation in
                 if self.process.isRunning {
                     self.process.terminationHandler = { [weak self] _ in
                         if let self {

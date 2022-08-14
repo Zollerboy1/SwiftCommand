@@ -14,21 +14,12 @@ final class SwiftCommandTests: XCTestCase {
                                  .spawn()
 
         var linesIterator = Self.lines.makeIterator()
-
-        if #available(macOS 12.0, *) {
-            for try await line in process.stdout.lines {
-                XCTAssertEqual(line, linesIterator.next())
-            }
-        } else {
-            guard let data = process.stdout.readToEnd(),
-                  let output = String(data: data, encoding: .utf8) else {
-                fatalError()
-            }
-
-            for line in output.split(separator: "\n").map(String.init) {
-                XCTAssertEqual(line, linesIterator.next())
-            }
+        
+        for try await line in process.stdout.lines {
+            XCTAssertEqual(line, linesIterator.next())
         }
+        
+        try process.wait()
     }
 
     func testComposition() async throws {
@@ -45,20 +36,28 @@ final class SwiftCommandTests: XCTestCase {
 
         var linesIterator = Self.lines.filter({ $0.contains("Test") }).makeIterator()
 
-        if #available(macOS 12.0, *) {
-            for try await line in grepProcess.stdout.lines {
-                XCTAssertEqual(line, linesIterator.next())
-            }
-        } else {
-            guard let data = grepProcess.stdout.readToEnd(),
-                  let output = String(data: data, encoding: .utf8) else {
-                fatalError()
-            }
-
-            for line in output.split(separator: "\n").map(String.init) {
-                XCTAssertEqual(line, linesIterator.next())
-            }
+        for try await line in grepProcess.stdout.lines {
+            XCTAssertEqual(line, linesIterator.next())
         }
+        
+        try echoProcess.wait()
+        try grepProcess.wait()
+    }
+    
+    func testStdin() async throws {
+        let process = try Command.findInPath(withName: "cat")!
+                                 .setStdin(.pipe)
+                                 .setStdout(.pipe)
+                                 .spawn()
+        
+        var stdin = process.stdin
+        
+        print("Foo", to: &stdin)
+        print("Bar", to: &stdin)
+        
+        let output = try await process.output
+        
+        XCTAssertEqual(output.stdout, "Foo\nBar\n")
     }
     
     func testStderr() async throws {

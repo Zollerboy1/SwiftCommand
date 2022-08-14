@@ -46,7 +46,7 @@ public struct FileInputSource: InputSource {
 }
 
 public struct PipeFromInputSource: InputSource {
-    private let pipe: Pipe
+    internal let pipe: Pipe
 
     public init<Stdin, Stdout, Stderr>(handle: ChildProcess<Stdin, Stdout, Stderr>.OutputHandle) {
         self.pipe = handle.pipe
