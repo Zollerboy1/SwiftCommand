@@ -617,8 +617,10 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
             }
         case .uncaughtSignal:
             return .success(.terminatedBySignal)
+#if canImport(Darwin)
         @unknown default:
             return .failure(Error.unknownTerminationReason)
+#endif
         }
     }
     

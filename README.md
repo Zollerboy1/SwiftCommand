@@ -16,7 +16,7 @@ let package = Package(
         // other dependencies...
         .package(
             url: "https://github.com/Zollerboy1/SwiftCommand.git",
-            from: "1.0.0"
+            from: "1.1.0"
         ),
     ],
     // ...

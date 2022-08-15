@@ -1,4 +1,9 @@
+#if canImport(Darwin)
 import Foundation
+#else
+@preconcurrency import Foundation
+#endif
+
 @preconcurrency import SystemPackage
 
 /// Describes the type of input source of a child process.
