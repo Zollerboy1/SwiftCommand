@@ -1,10 +1,15 @@
+/// A non-blocking sequence of `Character`s created by decoding the elements of
+/// `Base` as utf-8.
 public struct AsyncCharacterSequence<Base>: AsyncSequence
 where Base: AsyncSequence, Base.Element == UInt8 {
     @usableFromInline
     internal typealias Underlying = AsyncUnicodeScalarSequence<Base>
     
+    /// The type of element produced by this asynchronous sequence.
     public typealias Element = Character
     
+    /// The type of asynchronous iterator that produces elements of this
+    /// asynchronous sequence.
     public struct AsyncIterator: AsyncIteratorProtocol {
         @usableFromInline
         internal var _remaining: Underlying.AsyncIterator
@@ -16,6 +21,11 @@ where Base: AsyncSequence, Base.Element == UInt8 {
             self._accumulator = ""
         }
         
+        /// Asynchronously advances to the next element and returns it, or ends
+        /// the sequence if there is no next element.
+        ///
+        /// - Returns: The next element, if it exists, or `nil` to signal the
+        ///            end of the sequence.
         @inlinable
         public mutating func next() async rethrows -> Character? {
             while let scalar = try await self._remaining.next() {
@@ -39,6 +49,11 @@ where Base: AsyncSequence, Base.Element == UInt8 {
         self.underlying = .init(_base: base)
     }
     
+    /// Creates the asynchronous iterator that produces elements of this
+    /// asynchronous sequence.
+    ///
+    /// - Returns: An instance of the `AsyncIterator` type used to produce
+    ///            elements of the asynchronous sequence.
     public func makeAsyncIterator() -> AsyncIterator {
         return AsyncIterator(_underlying: self.underlying.makeAsyncIterator())
     }

@@ -2,11 +2,13 @@ import SystemPackage
 import Foundation
 
 extension FilePath {
-    public init?(substring: Substring) {
+    /// Convenience initializer for creating a `FilePath` from a `Substring`.
+    public init(substring: Substring) {
         self.init(String(substring))
     }
 
 
+    /// Creates a `Foundation.URL` from this `FilePath`.
     public var url: URL {
         if #available(macOS 13.0, *) {
             return .init(filePath: self.string)

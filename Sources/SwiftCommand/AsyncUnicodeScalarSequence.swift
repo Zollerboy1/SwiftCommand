@@ -1,7 +1,12 @@
+/// A non-blocking sequence of `UnicodeScalar`s created by decoding the elements
+/// of `Base` as utf-8.
 public struct AsyncUnicodeScalarSequence<Base>: AsyncSequence
 where Base: AsyncSequence, Base.Element == UInt8 {
+    /// The type of element produced by this asynchronous sequence.
     public typealias Element = UnicodeScalar
     
+    /// The type of asynchronous iterator that produces elements of this
+    /// asynchronous sequence.
     public struct AsyncIterator: AsyncIteratorProtocol {
         @usableFromInline
         internal var _base: Base.AsyncIterator
@@ -72,6 +77,11 @@ where Base: AsyncSequence, Base.Element == UInt8 {
             }
         }
         
+        /// Asynchronously advances to the next element and returns it, or ends
+        /// the sequence if there is no next element.
+        ///
+        /// - Returns: The next element, if it exists, or `nil` to signal the
+        ///            end of the sequence.
         @inlinable
         public mutating func next() async rethrows -> UnicodeScalar? {
             if let leftover = self._leftover {
@@ -97,8 +107,13 @@ where Base: AsyncSequence, Base.Element == UInt8 {
         self.base = base
     }
     
+    /// Creates the asynchronous iterator that produces elements of this
+    /// asynchronous sequence.
+    ///
+    /// - Returns: An instance of the `AsyncIterator` type used to produce
+    ///            elements of the asynchronous sequence.
     public func makeAsyncIterator() -> AsyncIterator {
-        return AsyncIterator(_base: base.makeAsyncIterator())
+        return AsyncIterator(_base: self.base.makeAsyncIterator())
     }
 }
 

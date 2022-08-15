@@ -534,37 +534,6 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
             try await self.spawn().status
         }
     }
-    
-    /// Executes the command as a child process, waits for it to complete, and
-    /// returns its collected output.
-    ///
-    /// This blocks the current thread until the child process has terminated.
-    ///
-    /// By default, stdout and stderr are captured (and used to provide the re-
-    /// sulting output), while stdin is connected to `/dev/null`.
-    ///
-    /// - Returns: The collected output of the child process.
-    @available(*, unavailable,
-               message: "Cannot capture output with this choice of stdout!")
-    public func waitForOutput() throws -> ProcessOutput {
-        fatalError("Cannot capture output with this choice of stdout!")
-    }
-    
-    /// Executes the command as a child process, waits for it to complete, and
-    /// returns its collected output.
-    ///
-    /// This doesn't block the current thread and allows other tasks to run
-    /// before the child process terminates.
-    ///
-    /// By default, stdout and stderr are captured (and used to provide the re-
-    /// sulting output), while stdin is connected to `/dev/null`.
-    @available(*, unavailable,
-               message: "Cannot capture output with this choice of stdout!")
-    public var output: ProcessOutput {
-        get async throws {
-            fatalError("Cannot capture output with this choice of stdout!")
-        }
-    }
 }
 
 extension Command where Stdout == UnspecifiedOutputDestination {
@@ -575,6 +544,9 @@ extension Command where Stdout == UnspecifiedOutputDestination {
     ///
     /// By default, stdout and stderr are captured (and used to provide the re-
     /// sulting output), while stdin is connected to `/dev/null`.
+    ///
+    /// - Note: This method can only be called when stdout is either still
+    ///         unspecfied or when it is piped.
     ///
     /// - Returns: The collected output of the child process.
     public func waitForOutput() throws -> ProcessOutput {
@@ -613,6 +585,9 @@ extension Command where Stdout == UnspecifiedOutputDestination {
     ///
     /// By default, stdout and stderr are captured (and used to provide the re-
     /// sulting output), while stdin is connected to `/dev/null`.
+    ///
+    /// - Note: This accessor can only be called when stdout is either still
+    ///         unspecfied or when it is piped.
     public var output: ProcessOutput {
         get async throws {
             if Stdin.self == UnspecifiedInputSource.self {
@@ -653,6 +628,9 @@ extension Command where Stdout == PipeOutputDestination {
     /// By default, stdout and stderr are captured (and used to provide the re-
     /// sulting output), while stdin is connected to `/dev/null`.
     ///
+    /// - Note: This method can only be called when stdout is either still
+    ///         unspecfied or when it is piped.
+    ///
     /// - Returns: The collected output of the child process.
     public func waitForOutput() throws -> ProcessOutput {
         if Stdin.self == UnspecifiedInputSource.self {
@@ -686,6 +664,9 @@ extension Command where Stdout == PipeOutputDestination {
     ///
     /// By default, stdout and stderr are captured (and used to provide the re-
     /// sulting output), while stdin is connected to `/dev/null`.
+    ///
+    /// - Note: This accessor can only be called when stdout is either still
+    ///         unspecfied or when it is piped.
     public var output: ProcessOutput {
         get async throws {
             if Stdin.self == UnspecifiedInputSource.self {

@@ -474,6 +474,12 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
         self.process.isRunning
     }
     
+    
+    /// Checks to see if the child process has already terminated and returns
+    /// the process's exit status if that's the case.
+    ///
+    /// - Note: This accessor is deprecated. Use
+    ///         ``ChildProcess/statusIfAvailable`` instead.
     @available(*, deprecated, renamed: "statusIfAvailable")
     public var exitStatus: ExitStatus? {
         get throws {
@@ -598,78 +604,6 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
             }
         }
     }
-    
-    
-    /// The handle for writing to the child process’s standard input (stdin), if
-    /// it is piped.
-    @available(*, unavailable,
-               message: "Cannot get handle for stdin, if it's not piped!")
-    public var stdin: InputHandle {
-        fatalError("Cannot get handle for stdin, if it's not piped!")
-    }
-    
-    
-    /// The handle for reading from the child process’s standard output
-    /// (stdout), if it is piped.
-    @available(*, unavailable,
-               message: "Cannot get handle for stdout, if it's not piped!")
-    public var stdout: OutputHandle {
-        fatalError("Cannot get handle for stdout, if it's not piped!")
-    }
-    
-    
-    /// Simultaneously waits for the child process to exit and collects all
-    /// remaining output on the stdout/stderr handles, returning a
-    /// ``ProcessOutput`` instance.
-    ///
-    /// This blocks the current thread until the child process has terminated.
-    ///
-    /// The stdin handle to the child process – if stdin is piped – will be
-    /// closed before waiting. This helps avoid deadlock: it ensures that the
-    /// child process does not block waiting for input from the parent process,
-    /// while the parent waits for the child to exit. If you want to disable
-    /// implicit closing of the pipe, you can do so, by setting
-    /// ``PipeInputSource/closeImplicitly`` to `false` on
-    /// ``PipeInputSource``.
-    ///
-    /// - Returns: The collected output of the child process.
-    @available(*, unavailable,
-               message: "Cannot capture output with this choice of stdout!")
-    public func waitWithOutput() throws -> ProcessOutput {
-        fatalError("Cannot capture output with this choice of stdout!")
-    }
-
-    /// Simultaneously waits for the child process to exit and collects all
-    /// remaining output on the stdout/stderr handles, returning a
-    /// ``ProcessOutput`` instance.
-    ///
-    /// This doesn't block the current thread and allows other tasks to run
-    /// before the child process terminates.
-    ///
-    /// The stdin handle to the child process – if stdin is piped – will be
-    /// closed before waiting. This helps avoid deadlock: it ensures that the
-    /// child process does not block waiting for input from the parent process,
-    /// while the parent waits for the child to exit. If you want to disable
-    /// implicit closing of the pipe, you can do so, by setting
-    /// ``PipeInputSource/closeImplicitly`` to `false` on
-    /// ``PipeInputSource``.
-    @available(*, unavailable,
-               message: "Cannot capture output with this choice of stdout!")
-    public var output: ProcessOutput {
-        get async throws {
-            fatalError("Cannot capture output with this choice of stdout!")
-        }
-    }
-    
-    
-    /// The handle for reading from the child process’s standard error output
-    /// (stderr), if it is piped.
-    @available(*, unavailable,
-               message: "Cannot get handle for stderr, if it's not piped!")
-    public var stderr: OutputHandle {
-        fatalError("Cannot get handle for stderr, if it's not piped!")
-    }
-    
 
 
     private func createExitStatus() -> Result<ExitStatus, Error> {
@@ -725,6 +659,8 @@ extension ChildProcess where Stdout == PipeOutputDestination {
     /// ``PipeInputSource/closeImplicitly`` to `false` on
     /// ``PipeInputSource``.
     ///
+    /// - Note: This method can only be called when stdout is piped.
+    ///
     /// - Returns: The collected output of the child process.
     public func waitWithOutput() throws -> ProcessOutput {
         try self.closePipedStdin()
@@ -748,6 +684,8 @@ extension ChildProcess where Stdout == PipeOutputDestination {
     /// implicit closing of the pipe, you can do so, by setting
     /// ``PipeInputSource/closeImplicitly`` to `false` on
     /// ``PipeInputSource``.
+    ///
+    /// - Note: This accessor can only be called when stdout is piped.
     public var output: ProcessOutput {
         get async throws {
             try self.closePipedStdin()

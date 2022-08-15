@@ -1,7 +1,12 @@
+/// A non-blocking sequence of newline-separated `String`s created by decoding
+/// the elements of `Base` as utf-8.
 public struct AsyncLineSequence<Base>: AsyncSequence
 where Base: AsyncSequence, Base.Element == UInt8 {
+    /// The type of element produced by this asynchronous sequence.
     public typealias Element = String
     
+    /// The type of asynchronous iterator that produces elements of this
+    /// asynchronous sequence.
     public struct AsyncIterator: AsyncIteratorProtocol {
         public typealias Element = String
         
@@ -18,6 +23,11 @@ where Base: AsyncSequence, Base.Element == UInt8 {
             self._leftover = nil
         }
         
+        /// Asynchronously advances to the next element and returns it, or ends
+        /// the sequence if there is no next element.
+        ///
+        /// - Returns: The next element, if it exists, or `nil` to signal the
+        ///            end of the sequence.
         @inlinable
         public mutating func next() async rethrows -> String? {
             /*
@@ -154,19 +164,24 @@ where Base: AsyncSequence, Base.Element == UInt8 {
     
     private let base: Base
     
-    public func makeAsyncIterator() -> AsyncIterator {
-        return AsyncIterator(_base: base.makeAsyncIterator())
+    internal init(_base base: Base) {
+        self.base = base
     }
     
-    internal init(underlyingSequence: Base) {
-        base = underlyingSequence
+    /// Creates the asynchronous iterator that produces elements of this
+    /// asynchronous sequence.
+    ///
+    /// - Returns: An instance of the `AsyncIterator` type used to produce
+    ///            elements of the asynchronous sequence.
+    public func makeAsyncIterator() -> AsyncIterator {
+        return AsyncIterator(_base: self.base.makeAsyncIterator())
     }
 }
 
 extension AsyncSequence where Self.Element == UInt8 {
-    /// A non-blocking sequence of newline-separated `Strings` created by
+    /// A non-blocking sequence of newline-separated `String`s created by
     /// decoding the elements of `self` as utf-8.
     public var lines: AsyncLineSequence<Self> {
-        AsyncLineSequence(underlyingSequence: self)
+        AsyncLineSequence(_base: self)
     }
 }
