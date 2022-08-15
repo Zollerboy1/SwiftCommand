@@ -2,31 +2,41 @@ import Foundation
 @preconcurrency import SystemPackage
 
 public protocol OutputDestination: Equatable, Sendable {
-    var processOutput: Either<FileHandle?, Pipe> { get throws }
+    func processOutput(forType type: OutputType) throws -> Either<FileHandle, Pipe>
 }
 
 public struct UnspecifiedOutputDestination: OutputDestination {
     internal init() {}
 
-    public var processOutput: Either<FileHandle?, Pipe> {
-        .first(nil)
+    public func processOutput(forType type: OutputType) throws -> Either<FileHandle, Pipe> {
+        switch type {
+        case .stdout:
+            return .first(.standardOutput)
+        case .stderr:
+            return .first(.standardError)
+        }
     }
 }
 
 public struct NullOutputDestination: OutputDestination {
-    public var processOutput: Either<FileHandle?, Pipe> {
+    public func processOutput(forType type: OutputType) throws -> Either<FileHandle, Pipe> {
         .first(.nullDevice)
     }
 }
 
 public struct InheritOutputDestination: OutputDestination {
-    public var processOutput: Either<FileHandle?, Pipe> {
-        .first(nil)
+    public func processOutput(forType type: OutputType) throws -> Either<FileHandle, Pipe> {
+        switch type {
+        case .stdout:
+            return .first(.standardOutput)
+        case .stderr:
+            return .first(.standardError)
+        }
     }
 }
 
 public struct PipeOutputDestination: OutputDestination {
-    public var processOutput: Either<FileHandle?, Pipe> {
+    public func processOutput(forType type: OutputType) throws -> Either<FileHandle, Pipe> {
         .second(.init())
     }
 }
@@ -40,19 +50,17 @@ public struct FileOutputDestination: OutputDestination {
         self.shouldAppend = shouldAppend
     }
 
-    public var processOutput: Either<FileHandle?, Pipe> {
-        get throws {
-            let fileHandle = try FileHandle(forWritingTo: self.path.url)
-            if self.shouldAppend {
-                if #available(macOS 10.15.4, *) {
-                    try fileHandle.seekToEnd()
-                } else {
-                    fileHandle.seekToEndOfFile()
-                }
+    public func processOutput(forType type: OutputType) throws -> Either<FileHandle, Pipe> {
+        let fileHandle = try FileHandle(forWritingTo: self.path.url)
+        if self.shouldAppend {
+            if #available(macOS 10.15.4, *) {
+                try fileHandle.seekToEnd()
+            } else {
+                fileHandle.seekToEndOfFile()
             }
-
-            return .first(fileHandle)
         }
+
+        return .first(fileHandle)
     }
 }
 

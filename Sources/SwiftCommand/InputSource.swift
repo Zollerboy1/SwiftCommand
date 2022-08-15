@@ -2,26 +2,26 @@ import Foundation
 @preconcurrency import SystemPackage
 
 public protocol InputSource: Equatable, Sendable {
-    var processInput: Either<FileHandle?, Pipe> { get throws }
+    var processInput: Either<FileHandle, Pipe> { get throws }
 }
 
 public struct UnspecifiedInputSource: InputSource {
     internal init() {}
 
-    public var processInput: Either<FileHandle?, Pipe> {
-        .first(nil)
+    public var processInput: Either<FileHandle, Pipe> {
+        .first(.standardInput)
     }
 }
 
 public struct NullInputSource: InputSource {
-    public var processInput: Either<FileHandle?, Pipe> {
+    public var processInput: Either<FileHandle, Pipe> {
         .first(.nullDevice)
     }
 }
 
 public struct InheritInputSource: InputSource {
-    public var processInput: Either<FileHandle?, Pipe> {
-        .first(nil)
+    public var processInput: Either<FileHandle, Pipe> {
+        .first(.standardInput)
     }
 }
 
@@ -32,7 +32,7 @@ public struct PipeInputSource: InputSource {
         self.closeImplicitly = closeImplicitly
     }
     
-    public var processInput: Either<FileHandle?, Pipe> {
+    public var processInput: Either<FileHandle, Pipe> {
         .second(.init())
     }
 }
@@ -44,7 +44,7 @@ public struct FileInputSource: InputSource {
         self.path = path
     }
 
-    public var processInput: Either<FileHandle?, Pipe> {
+    public var processInput: Either<FileHandle, Pipe> {
         get throws {
             try .first(.init(forReadingFrom: self.path.url))
         }
@@ -58,7 +58,7 @@ public struct PipeFromInputSource: InputSource {
         self.pipe = handle.pipe
     }
 
-    public var processInput: Either<FileHandle?, Pipe> {
+    public var processInput: Either<FileHandle, Pipe> {
         .second(self.pipe)
     }
     

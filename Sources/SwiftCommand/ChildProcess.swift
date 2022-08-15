@@ -426,7 +426,7 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
             process.standardOutput = stdoutPipe
         case let stdout:
             stdoutPipe = nil
-            switch try stdout.processOutput {
+            switch try stdout.processOutput(forType: .stdout) {
             case let .first(fileHandle):
                 process.standardOutput = fileHandle
             case let .second(pipe):
@@ -442,7 +442,7 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
             process.standardError = stderrPipe
         case let stderr:
             stderrPipe = nil
-            switch try stderr.processOutput {
+            switch try stderr.processOutput(forType: .stderr) {
             case let .first(fileHandle):
                 process.standardError = fileHandle
             case let .second(pipe):
