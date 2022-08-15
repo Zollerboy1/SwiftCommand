@@ -12,6 +12,8 @@ fileprivate final actor IOActor {
             let read = Glibc.read
 #elseif canImport(CRT)
             let read = CRT._read
+#else
+#error("Unsupported platform!")
 #endif
             let amount = read(fd, buffer.baseAddress, buffer.count)
             if amount >= 0 {

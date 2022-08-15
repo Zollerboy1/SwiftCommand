@@ -5,13 +5,13 @@ import Foundation
 /// should be spawned.
 ///
 /// A default configuration can be generated using
-/// ``init(executablePath:)``, where `executablePath` gives a path to the
-/// program to be executed, or using ``findInPath(withName:)``,
+/// ``Command/init(executablePath:)``, where `executablePath` gives a path to
+/// the program to be executed, or using ``Command/findInPath(withName:)``,
 /// where `name` is the name of a command line program available in `$PATH`.
 /// Additional builder methods allow the configuration to be changed (for
 /// example, by adding arguments) prior to spawning:
 ///
-/// ```
+/// ```swift
 /// let output = try Command.findInPath(withName: "echo")!
 ///                         .addArgument("Foo")
 ///                         .waitForOutput()
@@ -23,7 +23,7 @@ import Foundation
 /// builder methods change the command without needing to immediately spawn the
 /// process.
 ///
-/// ```
+/// ```swift
 /// let echoFoo = Command.findInPath(withName: "echo")!
 ///                      .addArgument("Foo")
 /// let foo1 = try echoFoo.waitForOutput()
@@ -33,7 +33,7 @@ import Foundation
 /// Similarly, you can call builder methods after spawning a process and then
 /// spawn a new process with the modified settings.
 ///
-/// ```
+/// ```swift
 /// let listDir = Command.findInPath(withName: "ls")!
 ///
 /// // Execute `ls` in the current directory of the program.
@@ -51,7 +51,7 @@ import Foundation
 /// To wait for the child process to terminate, but not block the current
 /// thread, you can use the `async`/`await` API on ``Command``, e.g.:
 ///
-/// ```
+/// ```swift
 /// let output = try await Command.findInPath(withName: "echo")!
 ///                               .addArgument("Foo")
 ///                               .output
@@ -78,11 +78,11 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
     /// The path of the executable file that will be invoked when this command
     /// is spawned.
     ///
-    /// Can be used in conjunction with ``findInPath(withName:)`` to find out
-    /// the path of an executable in one of the directories contained in the
-    /// `$PATH` environment variable:
+    /// Can be used in conjunction with ``Command/findInPath(withName:)`` to
+    /// find out the path of an executable in one of the directories contained
+    /// in the `$PATH` environment variable:
     ///
-    /// ```
+    /// ```swift
     /// let path = Command.findInPath(withName: "echo")!.executablePath
     ///
     /// print(path)
@@ -97,18 +97,18 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
     /// The environment dictionary that will be set for the program when this
     /// command is spawned.
     ///
-    /// If ``inheritEnvironment`` is `true`, this environment dictionary will be
-    /// merged with the environment of the parent process before the command is
-    /// spawned.
+    /// If ``Command/inheritEnvironment`` is `true`, this environment dictionary
+    /// will be merged with the environment of the parent process before the
+    /// command is spawned.
     public let environment: [String: String]
     
     /// Determines, if the environment of the child process inherits from the
     /// parent process's one.
     ///
-    /// ``inheritEnvironment`` is initially `true` but can be set to `false`
-    /// by calling ``clearEnv()``:
+    /// ``Command/inheritEnvironment`` is initially `true` but can be set to
+    /// `false` by calling ``Command/clearEnv()``:
     ///
-    /// ```
+    /// ```swift
     /// try Command.findInPath(withName: "foo")
     ///            .clearEnv()
     ///            .wait()
@@ -118,7 +118,7 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
     
     /// Determines the child process's working directory.
     ///
-    /// If ``cwd`` is `nil`, the working directory will not be changed.
+    /// If ``Command/cwd`` is `nil`, the working directory will not be changed.
     public let cwd: FilePath?
 
     internal let stdin: Stdin
@@ -156,8 +156,8 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
     /// - Parameters:
     ///   - executablePath: A `FilePath`, representing the program that should
     ///                     be executed when this command is spawned.
-    /// - Throws: An ``Error``, if there is no file at `executablePath`, or if
-    ///           it isn't executable.
+    /// - Throws: An ``Command/Error``, if there is no file at `executablePath`,
+    ///           or if it isn't executable.
     public init(executablePath: FilePath) throws
     where Stdin == UnspecifiedInputSource,
           Stdout == UnspecifiedOutputDestination,
@@ -187,10 +187,10 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
     /// an executable file with the given `name`, exactly like the shell does,
     /// when you type a command in the terminal.
     ///
-    /// This can be used in conjunction with ``executablePath`` to get the path
-    /// of a command line program:
+    /// This can be used in conjunction with ``Command/executablePath`` to get
+    /// the path of a command line program:
     ///
-    /// ```
+    /// ```swift
     /// let path = Command.findInPath(withName: "echo")!.executablePath
     ///
     /// print(path)
@@ -200,8 +200,8 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
     /// - Parameters:
     ///   - name: The name of the command line program to search for in `$PATH`.
     /// - Returns: An initialized command with the found program in
-    ///            ``executablePath``, or `nil`, if no program with the given
-    ///            `name` could be found.
+    ///            ``Command/executablePath``, or `nil`, if no program with the
+    ///            given `name` could be found.
     public static func findInPath(withName name: String) -> Command?
     where Stdin == UnspecifiedInputSource,
           Stdout == UnspecifiedOutputDestination,
@@ -327,9 +327,7 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
         .init(
             executablePath: self.executablePath,
             arguments: self.arguments,
-            environment: self.environment.merging(newEnvVariables) { old, new in
-                new
-            },
+            environment: self.environment.merging(newEnvVariables) { $1 },
             inheritEnvironment: self.inheritEnvironment,
             cwd: self.cwd,
             stdin: self.stdin,
@@ -339,12 +337,12 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
     }
 
     /// Clears the current environment dictionary and sets
-    /// ``inheritEnvironment`` to `false`.
+    /// ``Command/inheritEnvironment`` to `false`.
     ///
     /// This method should be used if the child process should not inherit the
     /// environment of the parent process:
     ///
-    /// ```
+    /// ```swift
     /// try Command.findInPath(withName: "foo")
     ///            .clearEnv()
     ///            .wait()
@@ -391,7 +389,7 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
     /// This can be used to give the child process input from a file, from the
     /// parent process itself, or even from the output of another child process:
     ///
-    /// ```
+    /// ```swift
     /// let catProcess = try Command.findInPath(withName: "cat")!
     ///         .setStdin(.read(fromFile: "SomeFile.txt"))
     ///         .setStdout(.pipe)
@@ -433,7 +431,7 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
     /// This can be used to channel the child process's output into a file, or
     /// to read it directly from the parent process:
     ///
-    /// ```
+    /// ```swift
     /// let output = try await Command.findInPath(withName: "echo")!
     ///                               .addArgument("Foo")
     ///                               .setStdout(.pipe)
@@ -467,7 +465,7 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
     /// This can be used to channel the child process's error output into a
     /// file, or to read it directly from the parent process:
     ///
-    /// ```
+    /// ```swift
     /// let output = try await Command.findInPath(withName: "cat")!
     ///         .addArgument("non_existing.txt")
     ///         .setStderr(.pipe)
@@ -534,6 +532,37 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
     public var status: ExitStatus {
         get async throws {
             try await self.spawn().status
+        }
+    }
+    
+    /// Executes the command as a child process, waits for it to complete, and
+    /// returns its collected output.
+    ///
+    /// This blocks the current thread until the child process has terminated.
+    ///
+    /// By default, stdout and stderr are captured (and used to provide the re-
+    /// sulting output), while stdin is connected to `/dev/null`.
+    ///
+    /// - Returns: The collected output of the child process.
+    @available(*, unavailable,
+               message: "Cannot capture output with this choice of stdout!")
+    public func waitForOutput() throws -> ProcessOutput {
+        fatalError("Cannot capture output with this choice of stdout!")
+    }
+    
+    /// Executes the command as a child process, waits for it to complete, and
+    /// returns its collected output.
+    ///
+    /// This doesn't block the current thread and allows other tasks to run
+    /// before the child process terminates.
+    ///
+    /// By default, stdout and stderr are captured (and used to provide the re-
+    /// sulting output), while stdin is connected to `/dev/null`.
+    @available(*, unavailable,
+               message: "Cannot capture output with this choice of stdout!")
+    public var output: ProcessOutput {
+        get async throws {
+            fatalError("Cannot capture output with this choice of stdout!")
         }
     }
 }

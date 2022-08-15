@@ -26,13 +26,19 @@ public struct InheritInputSource: InputSource {
 }
 
 public struct PipeInputSource: InputSource {
+    public let closeImplicitly: Bool
+    
+    internal init(closeImplicitly: Bool) {
+        self.closeImplicitly = closeImplicitly
+    }
+    
     public var processInput: Either<FileHandle?, Pipe> {
         .second(.init())
     }
 }
 
 public struct FileInputSource: InputSource {
-    private let path: FilePath
+    public let path: FilePath
 
     public init(path: FilePath) {
         self.path = path
@@ -70,7 +76,11 @@ extension InputSource where Self == InheritInputSource {
 }
 
 extension InputSource where Self == PipeInputSource {
-    public static var pipe: Self { .init() }
+    public static var pipe: Self { .init(closeImplicitly: true) }
+    
+    public static func pipe(closeImplicitly: Bool) -> Self {
+        .init(closeImplicitly: closeImplicitly)
+    }
 }
 
 extension InputSource where Self == FileInputSource {

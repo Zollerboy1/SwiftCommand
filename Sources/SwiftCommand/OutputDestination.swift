@@ -32,8 +32,8 @@ public struct PipeOutputDestination: OutputDestination {
 }
 
 public struct FileOutputDestination: OutputDestination {
-    private let path: FilePath
-    private let shouldAppend: Bool
+    public let path: FilePath
+    public let shouldAppend: Bool
 
     public init(path: FilePath, appending shouldAppend: Bool) {
         self.path = path

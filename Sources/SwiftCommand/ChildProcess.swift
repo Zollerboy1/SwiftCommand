@@ -1,13 +1,79 @@
 import Foundation
 
-public final class ChildProcess<Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination> {
-    public enum Error: Swift.Error {
+#if canImport(WinSDK)
+import WinSDK
+#endif
+
+/// Handle to a running or exited child process
+///
+/// This class is used to represent and manage child processes. A child process
+/// is created via the ``Command`` struct, which configures the spawning process
+/// and can itself be constructed using a builder-style interface.
+///
+/// There is no deinit implementation for child processes, so if you do not
+/// ensure the ``ChildProcess`` has exited then it will continue to run, even
+/// after the ``ChildProcess`` handle has gone out of scope.
+///
+/// Calling ``ChildProcess/wait()``,  ``ChildProcess/status``, or similar will
+/// make the parent process wait until the child has actually exited before
+/// continuing:
+///
+/// ```swift
+/// let process = try Command.findInPath(withName: "cat")
+///                          .addArgument("file.txt")
+///                          .spawn()
+///
+/// let exitStatus = try process.wait()
+/// ```
+public final class ChildProcess<Stdin, Stdout, Stderr>
+where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
+    /// An error that can be thrown while terminating a child process.
+    public enum Error: Swift.Error, CustomStringConvertible {
+        /// An error indicating that the output data could not be decoded as
+        /// utf-8.
         case couldNotDecodeOutput
-        case outputNotPiped
+        /// An error indicating that the reason for the termination of the
+        /// process is unknown.
         case unknownTerminationReason
+        
+        public var description: String {
+            switch self {
+            case .couldNotDecodeOutput:
+                return "Could not decode output data as an utf-8 string"
+            case .unknownTerminationReason:
+                return
+                    "The reason for the termination of the process is unknown"
+            }
+        }
     }
 
 
+    /// A handle to a child process's standard input (stdin).
+    ///
+    /// ``ChildProcess/InputHandle`` allows writing to the stdin of a child
+    /// process or closing it. Since it conforms to the `TextOutputStream`
+    /// protocol, you can also use the `print()` function in conjunction with
+    /// it.
+    ///
+    /// The handle can be obtained by accessing ``ChildProcess/stdin`` on a
+    /// ``ChildProcess`` instance whose stdin is piped:
+    ///
+    /// ```swift
+    /// let process = try Command.findInPath(withName: "cat")
+    ///                          .setStdin(.pipe)
+    ///                          .setStdout(.pipe)
+    ///                          .spawn()
+    ///
+    /// var stdin = process.stdin
+    ///
+    /// print("Foo", to: &stdin)
+    /// print("Bar", to: &stdin)
+    ///
+    /// let output = try await process.output
+    ///
+    /// print(output.stdout)
+    /// // Prints 'Foo\nBar\n'
+    /// ```
     public struct InputHandle: TextOutputStream {
         internal let pipe: Pipe
 
@@ -16,14 +82,29 @@ public final class ChildProcess<Stdin: InputSource, Stdout: OutputDestination, S
         }
 
 
+        /// Writes the given string to the child process's stdin stream.
+        ///
+        /// An exception is thrown if this handle has been invalidated by a call
+        /// to ``ChildProcess/InputHandle/close()``.
+        ///
+        /// - Parameters:
+        ///   - string: The string to append to the child process's stdin.
         public func write(_ string: String) {
             if #available(macOS 10.15.4, *) {
-                try! self.pipe.fileHandleForWriting.write(contentsOf: string.data(using: .utf8)!)
+                try! self.pipe.fileHandleForWriting
+                    .write(contentsOf: string.data(using: .utf8)!)
             } else {
                 self.pipe.fileHandleForWriting.write(string.data(using: .utf8)!)
             }
         }
 
+        /// Writes the given data to the child process's stdin stream.
+        ///
+        /// An exception is thrown if this handle has been invalidated by a call
+        /// to ``ChildProcess/InputHandle/close()``.
+        ///
+        /// - Parameters:
+        ///   - data: The data to append to the child process's stdin.
         public func write<T: DataProtocol>(contentsOf data: T) {
             if #available(macOS 10.15.4, *) {
                 try! self.pipe.fileHandleForWriting.write(contentsOf: data)
@@ -33,19 +114,62 @@ public final class ChildProcess<Stdin: InputSource, Stdout: OutputDestination, S
         }
 
 
+        /// Closes the child process's stdin stream, ensuring that the process
+        /// does not block waiting for input from the parent anymore.
+        ///
+        /// This invalidates the input handle. If you try to keep writing to
+        /// it, an exception is thrown.
         public func close() {
             try! self.pipe.fileHandleForWriting.close()
         }
     }
 
+    /// A handle to a child process's standard output (stdout) or stderr.
+    ///
+    /// ``ChildProcess/OutputHandle`` allows reading from the stdout or stderr
+    /// of a child process. You can access
+    /// ``ChildProcess/OutputHandle/availableData`` or call
+    /// ``ChildProcess/OutputHandle/read(upToCount:)`` to get the currently
+    /// available data of the child process's output, or call
+    /// ``ChildProcess/OutputHandle/readToEnd()`` to read data until the child
+    /// process sends an end of file signal. The convenience accessors
+    /// ``ChildProcess/OutputHandle/characters`` and
+    /// ``ChildProcess/OutputHandle/lines`` are also available and give access
+    /// to `AsyncSequence`'s, returning characters or lines output by the child
+    /// process asynchronously.
+    ///
+    /// The handle can be obtained by accessing ``ChildProcess/stdout`` or
+    /// ``ChildProcess/stderr`` on a ``ChildProcess`` instance whose stdout or
+    /// stderr is respectively piped:
+    ///
+    /// ```swift
+    /// let process = try Command.findInPath(withName: "echo")
+    ///                          .addArguments("Foo", "Bar")
+    ///                          .setStdout(.pipe)
+    ///                          .spawn()
+    ///
+    /// for try await line in process.stdout.lines {
+    ///     print(line)
+    /// }
+    /// // Prints 'Foo' and 'Bar'
+    ///
+    /// try process.wait()
+    /// // Ensure the process is terminated before exiting the parent process
+    /// ```
     public struct OutputHandle {
-        public struct AsyncCharacters: AsyncSequence { // Should be replaced by 'some AsyncSequence<Character>' as soon as that is available.
+        /// An asynchronous sequence of characters, output by a child process.
+        // Should be replaced by 'some AsyncSequence<Character>' as soon as that
+        // is available.
+        public struct AsyncCharacters: AsyncSequence {
             @usableFromInline
             internal typealias Base =
                 AsyncCharacterSequence<FileHandle.CustomAsyncBytes>
             
+            /// The type of element produced by this asynchronous sequence.
             public typealias Element = Character
 
+            /// The type of asynchronous iterator that produces elements of this
+            /// asynchronous sequence.
             public struct AsyncIterator: AsyncIteratorProtocol {
                 @usableFromInline
                 internal var _base: Base.AsyncIterator
@@ -54,6 +178,11 @@ public final class ChildProcess<Stdin: InputSource, Stdout: OutputDestination, S
                     self._base = _base
                 }
 
+                /// Asynchronously advances to the next element and returns it,
+                /// or ends the sequence if there is no next element.
+                ///
+                /// - Returns: The next element, if it exists, or `nil` to
+                ///            signal the end of the sequence.
                 @inlinable
                 public mutating func next() async throws -> Character? {
                     try await self._base.next()
@@ -66,18 +195,29 @@ public final class ChildProcess<Stdin: InputSource, Stdout: OutputDestination, S
                 self.base = base
             }
 
+            /// Creates the asynchronous iterator that produces elements of this
+            /// asynchronous sequence.
+            ///
+            /// - Returns: An instance of the `AsyncIterator` type used to
+            ///            produce elements of the asynchronous sequence.
             public func makeAsyncIterator() -> AsyncIterator {
                 .init(_base: self.base.makeAsyncIterator())
             }
         }
 
-        public struct AsyncLines: AsyncSequence { // Should be replaced by 'some AsyncSequence<String>' as soon as that is available.
+        /// An asynchronous sequence of characters, output by a child process.
+        // Should be replaced by 'some AsyncSequence<String>' as soon as that is
+        // available.
+        public struct AsyncLines: AsyncSequence {
             @usableFromInline
             internal typealias Base =
                 AsyncLineSequence<FileHandle.CustomAsyncBytes>
             
+            /// The type of element produced by this asynchronous sequence.
             public typealias Element = String
 
+            /// The type of asynchronous iterator that produces elements of this
+            /// asynchronous sequence.
             public struct AsyncIterator: AsyncIteratorProtocol {
                 @usableFromInline
                 internal var _base: Base.AsyncIterator
@@ -85,7 +225,12 @@ public final class ChildProcess<Stdin: InputSource, Stdout: OutputDestination, S
                 fileprivate init(_base: Base.AsyncIterator) {
                     self._base = _base
                 }
-
+                
+                /// Asynchronously advances to the next element and returns it,
+                /// or ends the sequence if there is no next element.
+                ///
+                /// - Returns: The next element, if it exists, or `nil` to
+                ///            signal the end of the sequence.
                 @inlinable
                 public mutating func next() async throws -> String? {
                     try await self._base.next()
@@ -97,7 +242,12 @@ public final class ChildProcess<Stdin: InputSource, Stdout: OutputDestination, S
             fileprivate init(_base base: Base) {
                 self.base = base
             }
-
+            
+            /// Creates the asynchronous iterator that produces elements of this
+            /// asynchronous sequence.
+            ///
+            /// - Returns: An instance of the `AsyncIterator` type used to
+            ///            produce elements of the asynchronous sequence.
             public func makeAsyncIterator() -> AsyncIterator {
                 .init(_base: self.base.makeAsyncIterator())
             }
@@ -111,19 +261,42 @@ public final class ChildProcess<Stdin: InputSource, Stdout: OutputDestination, S
         }
 
 
+        /// The data currently available in the child process's output stream.
+        ///
+        /// This accessor reads up to a buffer of data and returns it; if no
+        /// data is available, it blocks. Returns an empty `Data` object if the
+        /// child process closed the stream.
         public var availableData: Data {
             self.pipe.fileHandleForReading.availableData
         }
 
         
+        /// Reads up to the specified number of bytes of data synchronously from
+        /// the child process's output stream.
+        ///
+        /// This method reads up to `count` bytes from the channel. Returns an
+        /// empty `Data` object if the child process closed the stream.
+        ///
+        /// - Parameters:
+        ///   - count: The number of bytes to read from the child process's
+        ///            output stream.
+        /// - Returns: The data currently available in the stream, up to `count`
+        ///            number of bytes, or an empty `Data` object if the stream
+        ///            is closed.
         public func read(upToCount count: Int) -> Data? {
             if #available(macOS 10.15.4, *) {
-                return try! self.pipe.fileHandleForReading.read(upToCount: count)
+                return
+                    try! self.pipe.fileHandleForReading.read(upToCount: count)
             } else {
                 return self.pipe.fileHandleForReading.readData(ofLength: count)
             }
         }
 
+        /// Reads data synchronously up to the end of file or maximum number of
+        /// bytes from the child process's output stream.
+        ///
+        /// - Returns: The data in the stream until an end-of-file indicator is
+        ///            encountered.
         public func readToEnd() -> Data? {
             if #available(macOS 10.15.4, *) {
                 return try! self.pipe.fileHandleForReading.readToEnd()
@@ -133,30 +306,79 @@ public final class ChildProcess<Stdin: InputSource, Stdout: OutputDestination, S
         }
 
 
+        /// Returns an asynchronous sequence returning the decoded characters
+        /// output by the child process.
+        ///
+        /// ```swift
+        /// let process = try Command.findInPath(withName: "echo")
+        ///                          .addArgument("Foo")
+        ///                          .setStdout(.pipe)
+        ///                          .spawn()
+        ///
+        /// for try await character in process.stdout.characters {
+        ///     print(character)
+        /// }
+        /// // Prints 'F', 'o', 'o', and '\n'
+        ///
+        /// try process.wait()
+        /// // Ensure the process is terminated before exiting the parent
+        /// // process
+        /// ```
         public var characters: AsyncCharacters {
             .init(_base: self.pipe.fileHandleForReading.bytes.characters)
         }
 
+        /// Returns an asynchronous sequence returning the decoded lines output
+        /// by the child process.
+        ///
+        /// ```swift
+        /// let process = try Command.findInPath(withName: "echo")
+        ///                          .addArgument("Foo")
+        ///                          .setStdout(.pipe)
+        ///                          .spawn()
+        ///
+        /// for try await line in process.stdout.lines {
+        ///     print(line)
+        /// }
+        /// // Prints 'Foo' and 'Bar'
+        ///
+        /// try process.wait()
+        /// // Ensure the process is terminated before exiting the parent
+        /// // process
+        /// ```
         public var lines: AsyncLines {
             .init(_base: self.pipe.fileHandleForReading.bytes.lines)
         }
     }
+    
+    
+    internal typealias GeneratingCommand = Command<Stdin, Stdout, Stderr>
 
-
-    private let command: Command<Stdin, Stdout, Stderr>
+    private let command: GeneratingCommand
     private let process: Process
     private let stdinPipe, stdoutPipe, stderrPipe: Pipe?
+    private let closeStdinImplicitly: Bool
 
-    private init(command: Command<Stdin, Stdout, Stderr>, process: Process, stdinPipe: Pipe?, stdoutPipe: Pipe?, stderrPipe: Pipe?) {
+    private init(
+        command: GeneratingCommand,
+        process: Process,
+        stdinPipe: Pipe?,
+        stdoutPipe: Pipe?,
+        stderrPipe: Pipe?,
+        closeStdinImplicitly: Bool
+    ) {
         self.command = command
         self.process = process
         self.stdinPipe = stdinPipe
         self.stdoutPipe = stdoutPipe
         self.stderrPipe = stderrPipe
+        self.closeStdinImplicitly = closeStdinImplicitly
     }
 
 
-    internal static func spawn(withCommand command: Command<Stdin, Stdout, Stderr>) throws -> ChildProcess<Stdin, Stdout, Stderr> {
+    internal static func spawn(
+        withCommand command: GeneratingCommand
+    ) throws -> ChildProcess<Stdin, Stdout, Stderr> {
         let process = Process()
         
         process.executableURL = command.executablePath.url
@@ -164,7 +386,9 @@ public final class ChildProcess<Stdin: InputSource, Stdout: OutputDestination, S
 
         let environment: [String: String]
         if command.inheritEnvironment {
-            environment = ProcessInfo.processInfo.environment.merging(command.environment) { old, new in new }
+            environment = ProcessInfo.processInfo
+                                     .environment
+                                     .merging(command.environment) { $1 }
         } else {
             environment = command.environment
         }
@@ -177,15 +401,15 @@ public final class ChildProcess<Stdin: InputSource, Stdout: OutputDestination, S
 
 
         let stdinPipe: Pipe?
+        let closeStdinImplicitly: Bool
         switch command.stdin {
-        case is PipeInputSource:
+        case let pipeSource as PipeInputSource:
             stdinPipe = Pipe()
+            closeStdinImplicitly = pipeSource.closeImplicitly
             process.standardInput = stdinPipe
-        case let pipeFromSource as PipeFromInputSource:
-            stdinPipe = pipeFromSource.pipe
-            process.standardInput = pipeFromSource.pipe
         case let stdin:
             stdinPipe = nil
+            closeStdinImplicitly = false
             switch try stdin.processInput {
             case let .first(fileHandle):
                 process.standardInput = fileHandle
@@ -229,19 +453,37 @@ public final class ChildProcess<Stdin: InputSource, Stdout: OutputDestination, S
 
         try process.run()
 
-        return .init(command: command, process: process, stdinPipe: stdinPipe, stdoutPipe: stdoutPipe, stderrPipe: stderrPipe)
+        return .init(
+            command: command,
+            process: process,
+            stdinPipe: stdinPipe,
+            stdoutPipe: stdoutPipe,
+            stderrPipe: stderrPipe,
+            closeStdinImplicitly: closeStdinImplicitly
+        )
     }
 
 
+    /// The pid of the child process.
     public var identifier: Int32 {
         self.process.processIdentifier
     }
 
+    /// Indicates, if the child process is still running.
     public var isRunning: Bool {
         self.process.isRunning
     }
-
+    
+    @available(*, deprecated, renamed: "statusIfAvailable")
     public var exitStatus: ExitStatus? {
+        get throws {
+            try self.statusIfAvailable
+        }
+    }
+
+    /// Checks to see if the child process has already terminated and returns
+    /// the process's exit status if that's the case.
+    public var statusIfAvailable: ExitStatus? {
         get throws {
             if self.process.isRunning {
                 return nil
@@ -252,15 +494,66 @@ public final class ChildProcess<Stdin: InputSource, Stdout: OutputDestination, S
     }
 
 
+    /// Sends an interrupt signal (`SIGINT`) to the child process. This means
+    /// that the child process is terminated, if it isn't intentionally ignoring
+    /// this signal.
+    ///
+    /// Calling this method has no effect, if the child process has already
+    /// terminated.
     public func interrupt() {
         self.process.interrupt()
     }
 
+    /// Sends a terminate signal (`SIGTERM`) to the child process. This means
+    /// that the child process is terminated, if it isn't intentionally ignoring
+    /// this signal.
+    ///
+    /// Calling this method has no effect, if the child process has already
+    /// terminated.
     public func terminate() {
         self.process.terminate()
     }
     
-
+    /// Sends a kill signal (`SIGKILL`) to the child process. This normally
+    /// means that the child process is immediately terminated, no matter what.
+    ///
+    /// Use this method cautiously, since the child process cannot react to it
+    /// in any way.
+    ///
+    /// Calling this method has no effect, if the child process has already
+    /// terminated. 
+    public func kill() {
+        if self.process.isRunning {
+#if canImport(WinSDK)
+            WinSDK.TerminateProcess(self.process.processHandle, 1)
+#elseif canImport(Darwin)
+            Darwin.kill(self.process.processIdentifier, SIGKILL)
+#elseif canImport(Glibc)
+            Glibc.kill(self.process.processIdentifier, SIGKILL)
+#else
+#error("Unsupported platform!")
+#endif
+        }
+    }
+    
+    
+    /// Waits for the child process to exit completely, returning the status
+    /// that it exited with.
+    ///
+    /// This method will continue to have the same return value after it has
+    /// been called at least once.
+    ///
+    /// This blocks the current thread until the child process has terminated.
+    ///
+    /// The stdin handle to the child process – if stdin is piped – will be
+    /// closed before waiting. This helps avoid deadlock: it ensures that the
+    /// child process does not block waiting for input from the parent process,
+    /// while the parent waits for the child to exit. If you want to disable
+    /// implicit closing of the pipe, you can do so, by setting
+    /// ``PipeInputSource/closeImplicitly`` to `false` on
+    /// ``PipeInputSource``.
+    ///
+    /// - Returns: The exit status of the child process.
     @discardableResult
     public func wait() throws -> ExitStatus {
         try self.closePipedStdin()
@@ -270,6 +563,22 @@ public final class ChildProcess<Stdin: InputSource, Stdout: OutputDestination, S
         return try self.createExitStatus().get()
     }
 
+    /// Waits for the child process to exit completely, returning the status
+    /// that it exited with.
+    ///
+    /// This accessor will continue to have the same return value after it has
+    /// been called at least once.
+    ///
+    /// This doesn't block the current thread and allows other tasks to run
+    /// before the child process terminates.
+    ///
+    /// The stdin handle to the child process – if stdin is piped – will be
+    /// closed before waiting. This helps avoid deadlock: it ensures that the
+    /// child process does not block waiting for input from the parent process,
+    /// while the parent waits for the child to exit. If you want to disable
+    /// implicit closing of the pipe, you can do so, by setting
+    /// ``PipeInputSource/closeImplicitly`` to `false` on
+    /// ``PipeInputSource``.
     public var status: ExitStatus {
         get async throws {
             try self.closePipedStdin()
@@ -289,6 +598,78 @@ public final class ChildProcess<Stdin: InputSource, Stdout: OutputDestination, S
             }
         }
     }
+    
+    
+    /// The handle for writing to the child process’s standard input (stdin), if
+    /// it is piped.
+    @available(*, unavailable,
+               message: "Cannot get handle for stdin, if it's not piped!")
+    public var stdin: InputHandle {
+        fatalError("Cannot get handle for stdin, if it's not piped!")
+    }
+    
+    
+    /// The handle for reading from the child process’s standard output
+    /// (stdout), if it is piped.
+    @available(*, unavailable,
+               message: "Cannot get handle for stdout, if it's not piped!")
+    public var stdout: OutputHandle {
+        fatalError("Cannot get handle for stdout, if it's not piped!")
+    }
+    
+    
+    /// Simultaneously waits for the child process to exit and collects all
+    /// remaining output on the stdout/stderr handles, returning a
+    /// ``ProcessOutput`` instance.
+    ///
+    /// This blocks the current thread until the child process has terminated.
+    ///
+    /// The stdin handle to the child process – if stdin is piped – will be
+    /// closed before waiting. This helps avoid deadlock: it ensures that the
+    /// child process does not block waiting for input from the parent process,
+    /// while the parent waits for the child to exit. If you want to disable
+    /// implicit closing of the pipe, you can do so, by setting
+    /// ``PipeInputSource/closeImplicitly`` to `false` on
+    /// ``PipeInputSource``.
+    ///
+    /// - Returns: The collected output of the child process.
+    @available(*, unavailable,
+               message: "Cannot capture output with this choice of stdout!")
+    public func waitWithOutput() throws -> ProcessOutput {
+        fatalError("Cannot capture output with this choice of stdout!")
+    }
+
+    /// Simultaneously waits for the child process to exit and collects all
+    /// remaining output on the stdout/stderr handles, returning a
+    /// ``ProcessOutput`` instance.
+    ///
+    /// This doesn't block the current thread and allows other tasks to run
+    /// before the child process terminates.
+    ///
+    /// The stdin handle to the child process – if stdin is piped – will be
+    /// closed before waiting. This helps avoid deadlock: it ensures that the
+    /// child process does not block waiting for input from the parent process,
+    /// while the parent waits for the child to exit. If you want to disable
+    /// implicit closing of the pipe, you can do so, by setting
+    /// ``PipeInputSource/closeImplicitly`` to `false` on
+    /// ``PipeInputSource``.
+    @available(*, unavailable,
+               message: "Cannot capture output with this choice of stdout!")
+    public var output: ProcessOutput {
+        get async throws {
+            fatalError("Cannot capture output with this choice of stdout!")
+        }
+    }
+    
+    
+    /// The handle for reading from the child process’s standard error output
+    /// (stderr), if it is piped.
+    @available(*, unavailable,
+               message: "Cannot get handle for stderr, if it's not piped!")
+    public var stderr: OutputHandle {
+        fatalError("Cannot get handle for stderr, if it's not piped!")
+    }
+    
 
 
     private func createExitStatus() -> Result<ExitStatus, Error> {
@@ -308,25 +689,43 @@ public final class ChildProcess<Stdin: InputSource, Stdout: OutputDestination, S
     }
     
     private func closePipedStdin() throws {
-        if Stdin.self == PipeInputSource.self
-            || Stdin.self == PipeFromInputSource.self {
+        if self.closeStdinImplicitly {
             try self.stdinPipe!.fileHandleForWriting.close()
         }
     }
 }
 
 extension ChildProcess where Stdin == PipeInputSource {
+    /// The handle for writing to the child process’s standard input (stdin), if
+    /// it is piped.
     public var stdin: InputHandle {
         .init(pipe: self.stdinPipe!)
     }
 }
 
 extension ChildProcess where Stdout == PipeOutputDestination {
+    /// The handle for reading from the child process’s standard output
+    /// (stdout), if it is piped.
     public var stdout: OutputHandle {
         .init(pipe: self.stdoutPipe!)
     }
 
 
+    /// Simultaneously waits for the child process to exit and collects all
+    /// remaining output on the stdout/stderr handles, returning a
+    /// ``ProcessOutput`` instance.
+    ///
+    /// This blocks the current thread until the child process has terminated.
+    ///
+    /// The stdin handle to the child process – if stdin is piped – will be
+    /// closed before waiting. This helps avoid deadlock: it ensures that the
+    /// child process does not block waiting for input from the parent process,
+    /// while the parent waits for the child to exit. If you want to disable
+    /// implicit closing of the pipe, you can do so, by setting
+    /// ``PipeInputSource/closeImplicitly`` to `false` on
+    /// ``PipeInputSource``.
+    ///
+    /// - Returns: The collected output of the child process.
     public func waitWithOutput() throws -> ProcessOutput {
         try self.closePipedStdin()
         
@@ -335,6 +734,20 @@ extension ChildProcess where Stdout == PipeOutputDestination {
         return try self.createProcessOutput().get()
     }
 
+    /// Simultaneously waits for the child process to exit and collects all
+    /// remaining output on the stdout/stderr handles, returning a
+    /// ``ProcessOutput`` instance.
+    ///
+    /// This doesn't block the current thread and allows other tasks to run
+    /// before the child process terminates.
+    ///
+    /// The stdin handle to the child process – if stdin is piped – will be
+    /// closed before waiting. This helps avoid deadlock: it ensures that the
+    /// child process does not block waiting for input from the parent process,
+    /// while the parent waits for the child to exit. If you want to disable
+    /// implicit closing of the pipe, you can do so, by setting
+    /// ``PipeInputSource/closeImplicitly`` to `false` on
+    /// ``PipeInputSource``.
     public var output: ProcessOutput {
         get async throws {
             try self.closePipedStdin()
@@ -343,7 +756,8 @@ extension ChildProcess where Stdout == PipeOutputDestination {
                 if self.process.isRunning {
                     self.process.terminationHandler = { [weak self] _ in
                         if let self {
-                            continuation.resume(with: self.createProcessOutput())
+                            continuation
+                                .resume(with: self.createProcessOutput())
                         } else {
                             fatalError()
                         }
@@ -358,18 +772,33 @@ extension ChildProcess where Stdout == PipeOutputDestination {
     private func createProcessOutput() -> Result<ProcessOutput, Error> {
         self.createExitStatus()
             .flatMap { status in
-                guard let stdout = String(data: self.stdoutPipe!.fileHandleForReading.availableData, encoding: .utf8) else {
+                let stdoutData = self.stdoutPipe!.fileHandleForReading
+                                                 .availableData
+                guard let stdout = String(
+                    data: stdoutData,
+                    encoding: .utf8
+                ) else {
                     return .failure(Error.couldNotDecodeOutput)
                 }
 
-                let stderr = (self.stderrPipe?.fileHandleForReading.availableData).flatMap { String(data: $0, encoding: .utf8) }
+                let stderrData = self.stderrPipe?.fileHandleForReading
+                                                 .availableData
+                let stderr = stderrData.flatMap {
+                    String(data: $0, encoding: .utf8)
+                }
 
-                return .success(.init(status: status, stdout: stdout, stderr: stderr))
+                return .success(.init(
+                    status: status,
+                    stdout: stdout,
+                    stderr: stderr
+                ))
             }
     }
 }
 
 extension ChildProcess where Stderr == PipeOutputDestination {
+    /// The handle for reading from the child process’s standard error output
+    /// (stderr), if it is piped.
     public var stderr: OutputHandle {
         .init(pipe: self.stderrPipe!)
     }

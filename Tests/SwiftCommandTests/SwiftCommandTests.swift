@@ -69,4 +69,57 @@ final class SwiftCommandTests: XCTestCase {
         XCTAssertNotEqual(output.status, .success)
         XCTAssertEqual(output.stderr, "cat: non_existing.txt: No such file or directory\n")
     }
+    
+    func testParallelProcesses() async throws {
+        let command = Command.findInPath(withName: "cat")!
+                             .setStdin(.pipe(closeImplicitly: false))
+                             .setStdout(.pipe)
+        
+        try await withThrowingTaskGroup(of: ChildProcess<_, _, _>.self) { group in
+            for _ in 0..<10 {
+                group.addTask {
+                    let process = try command.spawn()
+                    
+                    Task.detached {
+                        for line in Self.lines {
+                            process.stdin.write(line)
+                            try await Task.sleep(nanoseconds: .random(in: 1_000..<500_000_000))
+                        }
+                        
+                        process.stdin.close()
+                    }
+                    
+                    return process
+                }
+            }
+            
+            for try await process in group {
+                let output = try await process.output
+                
+                XCTAssertEqual(output.stdout, Self.lines.joined())
+            }
+        }
+    }
+    
+    func testTermination() async throws {
+        let command = Command.findInPath(withName: "cat")!
+                             .setStdin(.pipe(closeImplicitly: false))
+                             .setStdout(.pipe)
+        
+        let process1 = try command.spawn()
+        let process2 = try command.spawn()
+        let process3 = try command.spawn()
+        
+        process1.interrupt()
+        let status1 = try await process1.status
+        XCTAssertEqual(status1, .terminatedBySignal)
+        
+        process2.terminate()
+        let status2 = try await process2.status
+        XCTAssertEqual(status2, .terminatedBySignal)
+        
+        process3.kill()
+        let status3 = try await process3.status
+        XCTAssertEqual(status3, .terminatedBySignal)
+    }
 }
