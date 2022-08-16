@@ -1,4 +1,4 @@
-#if canImport(Darwin)
+#if canImport(Darwin) && swift(>=5.7)
 import Foundation
 #else
 @preconcurrency import Foundation

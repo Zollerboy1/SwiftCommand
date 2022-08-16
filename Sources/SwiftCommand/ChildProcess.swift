@@ -592,7 +592,7 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
             return try await withCheckedThrowingContinuation { continuation in
                 if self.process.isRunning {
                     self.process.terminationHandler = { [weak self] _ in
-                        if let self {
+                        if let self = self {
                             continuation.resume(with: self.createExitStatus())
                         } else {
                             fatalError()
@@ -695,7 +695,7 @@ extension ChildProcess where Stdout == PipeOutputDestination {
             return try await withCheckedThrowingContinuation { continuation in
                 if self.process.isRunning {
                     self.process.terminationHandler = { [weak self] _ in
-                        if let self {
+                        if let self = self {
                             continuation
                                 .resume(with: self.createProcessOutput())
                         } else {
