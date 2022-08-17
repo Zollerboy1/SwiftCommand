@@ -1,6 +1,7 @@
 import Foundation
 
 fileprivate final actor IOActor {
+#if !os(Windows)
     fileprivate func read(
         from fd: Int32,
         into buffer: UnsafeMutableRawBufferPointer
@@ -10,9 +11,6 @@ fileprivate final actor IOActor {
             let read = Darwin.read
 #elseif canImport(Glibc)
             let read = Glibc.read
-#elseif canImport(CRT)
-            let read = CRT._read
-#else
 #error("Unsupported platform!")
 #endif
             let amount = read(fd, buffer.baseAddress, buffer.count)
@@ -29,6 +27,7 @@ fileprivate final actor IOActor {
             }
         }
     }
+#endif
     
     fileprivate func read(
         from handle: FileHandle,
@@ -174,7 +173,9 @@ extension FileHandle {
             fileprivate init(file: FileHandle) {
                 self._buffer = _AsyncBytesBuffer(_capacity: Self.bufferSize)
                 
+#if !os(Windows)
                 let fileDescriptor = file.fileDescriptor
+#endif
                 
                 self._buffer.readFunction = { buf in
                     buf._nextPointer = buf.baseAddress
@@ -186,6 +187,12 @@ extension FileHandle {
                         count: capacity
                     )
                     
+#if os(Windows)
+                    let readSize = try await IOActor.default.read(
+                        from: file,
+                        into: bufPtr
+                    )
+#else
                     let readSize: Int
                     if fileDescriptor >= 0 {
                         readSize = try await IOActor.default.read(
@@ -198,6 +205,7 @@ extension FileHandle {
                             into: bufPtr
                         )
                     }
+#endif
                     
                     buf._endPointer = buf._nextPointer + readSize
                     return readSize

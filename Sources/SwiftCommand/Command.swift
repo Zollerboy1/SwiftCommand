@@ -74,7 +74,24 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
         }
     }
 
-    
+
+#if os(Windows)
+    @inline(__always)
+    private static var pathVariable: String { "Path" }
+    @inline(__always)
+    private static var pathSeparator: Character { ";" }
+    @inline(__always)
+    private static var executableExtension: String { ".exe" }
+#else
+    @inline(__always)
+    private static var pathVariable: String { "PATH" }
+    @inline(__always)
+    private static var pathSeparator: Character { ":" }
+    @inline(__always)
+    private static var executableExtension: String { "" }
+#endif
+
+
     /// The path of the executable file that will be invoked when this command
     /// is spawned.
     ///
@@ -206,15 +223,24 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
     where Stdin == UnspecifiedInputSource,
           Stdout == UnspecifiedOutputDestination,
           Stderr == UnspecifiedOutputDestination {
-        guard let environmentPath = ProcessInfo.processInfo
-                                               .environment["PATH"] else {
+        let nameWithExtension: String
+        if !Self.executableExtension.isEmpty
+            && !name.hasSuffix(Self.executableExtension) {
+            nameWithExtension = name + Self.executableExtension
+        } else {
+            nameWithExtension = name
+        }
+        
+        guard let environmentPath =
+            ProcessInfo.processInfo.environment[Self.pathVariable] else {
             return nil
         }
 
-        guard let executablePath = environmentPath.split(separator: ":").lazy
+        guard let executablePath =
+            environmentPath.split(separator: Self.pathSeparator).lazy
             .compactMap(FilePath.init(substring:))
-            .map({ $0.appending(name) })
-            .first(where: { 
+            .map({ $0.appending(nameWithExtension) })
+            .first(where: {
                 FileManager.default.isExecutableFile(atPath: $0.string)
             }) else {
             return nil

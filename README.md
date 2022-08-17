@@ -1,6 +1,7 @@
 # SwiftCommand
 
-![Platform: macOS/Linux](https://img.shields.io/badge/platform-macOS%20%7C%20Linux-orange) ![Swift versions: 5.6](https://img.shields.io/badge/swift-5.6-blue)
+![Platform: macOS/Linux/Windows](https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-orange)
+![Swift versions: 5.6](https://img.shields.io/badge/swift-5.6-blue)
 
 A wrapper around `Foundation.Process`, inspired by Rust's
 `std::process::Command`. This package makes it easy to call command line
