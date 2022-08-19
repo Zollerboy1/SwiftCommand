@@ -602,6 +602,22 @@ extension Command where Stdout == UnspecifiedOutputDestination {
             }
         }
     }
+
+    /// Executes the command as a child process, waits for it to complete, and
+    /// returns its collected stdout data.
+    ///
+    /// This blocks the current thread until the child process has terminated.
+    ///
+    /// By default, stdout and stderr are captured (and used to provide the re-
+    /// sulting output), while stdin is connected to `/dev/null`.
+    ///
+    /// - Note: This method can only be called when stdout is either still
+    ///         unspecfied or when it is piped.
+    ///
+    /// - Returns: The collected stdout data of the child process.
+    public func waitForOutputData() throws -> Data {
+        try self.waitForOutput().stdoutData
+    }
     
     /// Executes the command as a child process, waits for it to complete, and
     /// returns its collected output.
@@ -641,6 +657,23 @@ extension Command where Stdout == UnspecifiedOutputDestination {
                                          .output
                 }
             }
+        }
+    }
+    
+    /// Executes the command as a child process, waits for it to complete, and
+    /// returns its collected stdout data.
+    ///
+    /// This doesn't block the current thread and allows other tasks to run
+    /// before the child process terminates.
+    ///
+    /// By default, stdout and stderr are captured (and used to provide the re-
+    /// sulting output), while stdin is connected to `/dev/null`.
+    ///
+    /// - Note: This accessor can only be called when stdout is either still
+    ///         unspecfied or when it is piped.
+    public var outputData: Data {
+        get async throws {
+            try await self.output.stdoutData
         }
     }
 }
@@ -681,6 +714,22 @@ extension Command where Stdout == PipeOutputDestination {
             }
         }
     }
+
+    /// Executes the command as a child process, waits for it to complete, and
+    /// returns its collected stdout data.
+    ///
+    /// This blocks the current thread until the child process has terminated.
+    ///
+    /// By default, stdout and stderr are captured (and used to provide the re-
+    /// sulting output), while stdin is connected to `/dev/null`.
+    ///
+    /// - Note: This method can only be called when stdout is either still
+    ///         unspecfied or when it is piped.
+    ///
+    /// - Returns: The collected stdout data of the child process.
+    public func waitForOutputData() throws -> Data {
+        try self.waitForOutput().stdoutData
+    }
     
     /// Executes the command as a child process, waits for it to complete, and
     /// returns its collected output.
@@ -716,6 +765,23 @@ extension Command where Stdout == PipeOutputDestination {
                                          .output
                 }
             }
+        }
+    }
+    
+    /// Executes the command as a child process, waits for it to complete, and
+    /// returns its collected stdout data.
+    ///
+    /// This doesn't block the current thread and allows other tasks to run
+    /// before the child process terminates.
+    ///
+    /// By default, stdout and stderr are captured (and used to provide the re-
+    /// sulting output), while stdin is connected to `/dev/null`.
+    ///
+    /// - Note: This accessor can only be called when stdout is either still
+    ///         unspecfied or when it is piped.
+    public var outputData: Data {
+        get async throws {
+            try await self.output.stdoutData
         }
     }
 }

@@ -729,7 +729,9 @@ extension ChildProcess where Stdout == PipeOutputDestination {
 
                 return .success(.init(
                     status: status,
+                    stdoutData: stdoutData,
                     stdout: stdout,
+                    stderrData: stderrData,
                     stderr: stderr
                 ))
             }
