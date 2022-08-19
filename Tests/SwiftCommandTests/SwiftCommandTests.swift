@@ -136,15 +136,18 @@ final class SwiftCommandTests: XCTestCase {
 #if canImport(Darwin)
         process1.interrupt()
         let status1 = try await process1.status
-        XCTAssertEqual(status1, .terminatedBySignal)
+        XCTAssertTrue(status1.wasTerminatedBySignal)
+        XCTAssertEqual(status1.terminationSignal, SIGINT)
         
         process2.terminate()
         let status2 = try await process2.status
-        XCTAssertEqual(status2, .terminatedBySignal)
+        XCTAssertTrue(status2.wasTerminatedBySignal)
+        XCTAssertEqual(status2.terminationSignal, SIGTERM)
 #endif
         
         process3.kill()
         let status3 = try await process3.status
-        XCTAssertEqual(status3, .terminatedBySignal)
+        XCTAssertTrue(status3.wasTerminatedBySignal)
+        XCTAssertEqual(status3.terminationSignal, SIGKILL)
     }
 }

@@ -616,7 +616,12 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
                 return .success(.error(exitCode: status))
             }
         case .uncaughtSignal:
+#if os(Windows)
             return .success(.terminatedBySignal)
+#else
+            let signal = self.process.terminationStatus
+            return .success(.terminatedBySignal(signal: signal))
+#endif
 #if canImport(Darwin)
         @unknown default:
             return .failure(Error.unknownTerminationReason)
