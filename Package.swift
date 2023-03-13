@@ -6,17 +6,16 @@ import PackageDescription
 let package = Package(
     name: "SwiftCommand",
     platforms: [
-        .macOS(.v10_15)
+        .macOS(.v12)
     ],
     products: [
-        // Products define the executables and libraries a package produces, and make them visible to other packages.
         .library(
             name: "SwiftCommand",
             targets: ["SwiftCommand"]),
+        .executable(name: "swift-command", targets: ["swift-command"])
+
     ],
     dependencies: [
-        // Dependencies declare other packages that this package depends on.
-        // .package(url: /* package url */, from: "1.0.0"),
         .package(url: "https://github.com/apple/swift-system", from: "1.0.0"),
     ],
     targets: [

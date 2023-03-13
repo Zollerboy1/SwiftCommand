@@ -163,7 +163,7 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
         public struct AsyncCharacters: AsyncSequence {
             @usableFromInline
             internal typealias Base =
-                AsyncCharacterSequence<AsyncBytes>
+            AsyncCharacterSequence<FileHandle.AsyncBytes>
             
             /// The type of element produced by this asynchronous sequence.
             public typealias Element = Character
@@ -211,7 +211,7 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
         public struct AsyncLines: AsyncSequence {
             @usableFromInline
             internal typealias Base =
-                AsyncLineSequence<AsyncBytes>
+                AsyncLineSequence<FileHandle.AsyncBytes>
             
             /// The type of element produced by this asynchronous sequence.
             public typealias Element = String

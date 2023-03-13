@@ -158,76 +158,87 @@ internal struct _AsyncBytesBuffer {
     }
 }
 
-public struct AsyncBytes: AsyncSequence {
-    public typealias Element = UInt8
+#if canImport(Darwin)
+// Use Foundation.FileHandle.AsyncBytes
+#else
+extension FileHandle {
+    public struct AsyncBytes: AsyncSequence {
+        public typealias Element = UInt8
 
-    public struct AsyncIterator: AsyncIteratorProtocol {
-        static let bufferSize = 16384
+        public struct AsyncIterator: AsyncIteratorProtocol {
+            static let bufferSize = 16384
 
-        @usableFromInline
-        internal var _buffer: _AsyncBytesBuffer
+            @usableFromInline
+            internal var _buffer: _AsyncBytesBuffer
 
-        fileprivate init(file: FileHandle) {
-            self._buffer = _AsyncBytesBuffer(_capacity: Self.bufferSize)
+            fileprivate init(file: FileHandle) {
+                self._buffer = _AsyncBytesBuffer(_capacity: Self.bufferSize)
 
 #if !os(Windows)
-            let fileDescriptor = file.fileDescriptor
+                let fileDescriptor = file.fileDescriptor
 #endif
 
-            self._buffer.readFunction = { buf in
-                buf._nextPointer = buf.baseAddress
+                self._buffer.readFunction = { buf in
+                    buf._nextPointer = buf.baseAddress
 
-                let capacity = buf.capacity
+                    let capacity = buf.capacity
 
-                let bufPtr = UnsafeMutableRawBufferPointer(
-                    start: buf._nextPointer,
-                    count: capacity
-                )
+                    let bufPtr = UnsafeMutableRawBufferPointer(
+                        start: buf._nextPointer,
+                        count: capacity
+                    )
 
 #if os(Windows)
-                let readSize = try await IOActor.default.read(
-                    from: file,
-                    into: bufPtr
-                )
-#else
-                let readSize: Int
-                if fileDescriptor >= 0 {
-                    readSize = try await IOActor.default.read(
-                        from: fileDescriptor,
-                        into: bufPtr
-                    )
-                } else {
-                    readSize = try await IOActor.default.read(
+                    let readSize = try await IOActor.default.read(
                         from: file,
                         into: bufPtr
                     )
-                }
+#else
+                    let readSize: Int
+                    if fileDescriptor >= 0 {
+                        readSize = try await IOActor.default.read(
+                            from: fileDescriptor,
+                            into: bufPtr
+                        )
+                    } else {
+                        readSize = try await IOActor.default.read(
+                            from: file,
+                            into: bufPtr
+                        )
+                    }
 #endif
 
-                buf._endPointer = buf._nextPointer + readSize
-                return readSize
+                    buf._endPointer = buf._nextPointer + readSize
+                    return readSize
+                }
+            }
+
+            @inlinable @inline(__always)
+            public mutating func next() async throws -> UInt8? {
+                return try await self._buffer._next()
             }
         }
 
-        @inlinable @inline(__always)
-        public mutating func next() async throws -> UInt8? {
-            return try await self._buffer._next()
+        var handle: FileHandle
+
+        fileprivate init(file: FileHandle) {
+            handle = file
+        }
+
+        public func makeAsyncIterator() -> AsyncIterator {
+            .init(file: handle)
         }
     }
-
-    var handle: FileHandle
-
-    fileprivate init(file: FileHandle) {
-        handle = file
-    }
-
-    public func makeAsyncIterator() -> AsyncIterator {
-        .init(file: handle)
-    }
 }
+#endif
+
 
 extension FileHandle {
-    public var bytes: SwiftCommand.AsyncBytes {
-        return SwiftCommand.AsyncBytes(file: self)
+    #if canImport(Darwin)
+    // use the bytes from the system
+    #else
+    public var bytes: FileHandle.AsyncBytes {
+        return FileHandle.AsyncBytes(file: self)
     }
+    #endif
 }

@@ -1,3 +1,7 @@
+
+#if canImport(Darwin)
+// Use Foundation.AsyncLineSequence
+#else
 /// A non-blocking sequence of newline-separated `String`s created by decoding
 /// the elements of `Base` as utf-8.
 public struct AsyncLineSequence<Base>: AsyncSequence
@@ -179,9 +183,11 @@ where Base: AsyncSequence, Base.Element == UInt8 {
 }
 
 extension AsyncSequence where Self.Element == UInt8 {
+
     /// A non-blocking sequence of newline-separated `String`s created by
     /// decoding the elements of `self` as utf-8.
     public var lines: AsyncLineSequence<Self> {
         AsyncLineSequence(_base: self)
     }
 }
+#endif
