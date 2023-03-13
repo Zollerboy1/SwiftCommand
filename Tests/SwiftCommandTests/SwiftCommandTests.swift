@@ -90,7 +90,13 @@ final class SwiftCommandTests: XCTestCase {
                              .setStdin(.pipe(closeImplicitly: false))
                              .setStdout(.pipe)
         
-        try await withThrowingTaskGroup(of: ChildProcess<_, _, _>.self) {
+        try await withThrowingTaskGroup(
+            of: ChildProcess<
+                PipeInputSource,
+                PipeOutputDestination,
+                UnspecifiedOutputDestination
+            >.self
+        ) {
             group in
             for _ in 0..<10 {
                 group.addTask {
