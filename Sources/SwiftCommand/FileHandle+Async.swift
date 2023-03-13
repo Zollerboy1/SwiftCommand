@@ -158,80 +158,76 @@ internal struct _AsyncBytesBuffer {
     }
 }
 
-extension FileHandle {
-    @usableFromInline
-    internal struct CustomAsyncBytes: AsyncSequence {
+public struct AsyncBytes: AsyncSequence {
+    public typealias Element = UInt8
+
+    public struct AsyncIterator: AsyncIteratorProtocol {
+        static let bufferSize = 16384
+
         @usableFromInline
-        internal typealias Element = UInt8
-        
-        @usableFromInline
-        internal struct AsyncIterator: AsyncIteratorProtocol {
-            static let bufferSize = 16384
-            
-            @usableFromInline
-            internal var _buffer: _AsyncBytesBuffer
-            
-            fileprivate init(file: FileHandle) {
-                self._buffer = _AsyncBytesBuffer(_capacity: Self.bufferSize)
-                
+        internal var _buffer: _AsyncBytesBuffer
+
+        fileprivate init(file: FileHandle) {
+            self._buffer = _AsyncBytesBuffer(_capacity: Self.bufferSize)
+
 #if !os(Windows)
-                let fileDescriptor = file.fileDescriptor
+            let fileDescriptor = file.fileDescriptor
 #endif
-                
-                self._buffer.readFunction = { buf in
-                    buf._nextPointer = buf.baseAddress
-                    
-                    let capacity = buf.capacity
-                    
-                    let bufPtr = UnsafeMutableRawBufferPointer(
-                        start: buf._nextPointer,
-                        count: capacity
-                    )
-                    
+
+            self._buffer.readFunction = { buf in
+                buf._nextPointer = buf.baseAddress
+
+                let capacity = buf.capacity
+
+                let bufPtr = UnsafeMutableRawBufferPointer(
+                    start: buf._nextPointer,
+                    count: capacity
+                )
+
 #if os(Windows)
-                    let readSize = try await IOActor.default.read(
+                let readSize = try await IOActor.default.read(
+                    from: file,
+                    into: bufPtr
+                )
+#else
+                let readSize: Int
+                if fileDescriptor >= 0 {
+                    readSize = try await IOActor.default.read(
+                        from: fileDescriptor,
+                        into: bufPtr
+                    )
+                } else {
+                    readSize = try await IOActor.default.read(
                         from: file,
                         into: bufPtr
                     )
-#else
-                    let readSize: Int
-                    if fileDescriptor >= 0 {
-                        readSize = try await IOActor.default.read(
-                            from: fileDescriptor,
-                            into: bufPtr
-                        )
-                    } else {
-                        readSize = try await IOActor.default.read(
-                            from: file,
-                            into: bufPtr
-                        )
-                    }
-#endif
-                    
-                    buf._endPointer = buf._nextPointer + readSize
-                    return readSize
                 }
-            }
-            
-            @inlinable @inline(__always)
-            public mutating func next() async throws -> UInt8? {
-                return try await self._buffer._next()
+#endif
+
+                buf._endPointer = buf._nextPointer + readSize
+                return readSize
             }
         }
-        
-        var handle: FileHandle
-        
-        fileprivate init(file: FileHandle) {
-            handle = file
-        }
-        
-        @usableFromInline
-        internal func makeAsyncIterator() -> AsyncIterator {
-            .init(file: handle)
+
+        @inlinable @inline(__always)
+        public mutating func next() async throws -> UInt8? {
+            return try await self._buffer._next()
         }
     }
-    
-    internal var bytes: CustomAsyncBytes {
-        return CustomAsyncBytes(file: self)
+
+    var handle: FileHandle
+
+    fileprivate init(file: FileHandle) {
+        handle = file
+    }
+
+    public func makeAsyncIterator() -> AsyncIterator {
+        .init(file: handle)
+    }
+}
+
+extension FileHandle {
+    public var bytes: SwiftCommand.AsyncBytes {
+        return SwiftCommand.AsyncBytes(file: self)
     }
 }
