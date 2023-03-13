@@ -1,7 +1,11 @@
 # SwiftCommand
 
-![Platform: macOS/Linux/Windows](https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-orange)
-![Swift versions: 5.6](https://img.shields.io/badge/swift-5.6-blue)
+![Platform: macOS/Linux/Windows\*](https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows%2A-orange)
+![Swift versions: 5.6, 5.7](https://img.shields.io/badge/swift-5.6%20%7C%205.7-blue)
+
+\*Windows support is only experimental for now.
+
+---
 
 A wrapper around `Foundation.Process`, inspired by Rust's
 `std::process::Command`. This package makes it easy to call command line
@@ -19,7 +23,7 @@ let package = Package(
         // other dependencies...
         .package(
             url: "https://github.com/Zollerboy1/SwiftCommand.git",
-            from: "1.1.0"
+            from: "1.2.0"
         ),
     ],
     // ...
