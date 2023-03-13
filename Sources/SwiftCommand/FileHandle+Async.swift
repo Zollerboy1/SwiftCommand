@@ -11,6 +11,7 @@ fileprivate final actor IOActor {
             let read = Darwin.read
 #elseif canImport(Glibc)
             let read = Glibc.read
+#else
 #error("Unsupported platform!")
 #endif
             let amount = read(fd, buffer.baseAddress, buffer.count)
