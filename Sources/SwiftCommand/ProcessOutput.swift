@@ -26,7 +26,7 @@ public struct ProcessOutput: Equatable, Sendable {
     /// process, if stderr was piped; `nil` otherwise.
     public let stderr: String?
 
-    internal init(
+    public init(
         status: ExitStatus,
         stdoutData: Data,
         stdout: String,

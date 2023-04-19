@@ -1,6 +1,6 @@
 /// Describes the result of a child process after it has terminated.
 public struct ExitStatus: Equatable, Sendable {
-    private enum Status: Equatable, Sendable {
+    public enum Status: Equatable, Sendable {
         case success
 #if os(Windows)
         case terminatedBySignal
@@ -12,7 +12,7 @@ public struct ExitStatus: Equatable, Sendable {
 
     private let status: Status
 
-    private init(status: Status) {
+    public init(status: Status) {
         self.status = status
     }
 
