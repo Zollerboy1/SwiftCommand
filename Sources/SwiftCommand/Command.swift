@@ -65,11 +65,18 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
     public enum Error: Swift.Error, CustomStringConvertible {
         /// An error indicating that no executable exists at the given path.
         case executableNotFound(path: FilePath)
+        case missingPathVariable
+        case cannotConstructExecutablePath(commandName: String)
+
         
         public var description: String {
             switch self {
             case let .executableNotFound(path):
                 return "There is no executable at path '\(path)'"
+            case .missingPathVariable:
+                return "Unlikely but path variable unavailable  process environment"
+            case let .cannotConstructExecutablePath(commandName: name):
+                return "Cannot construct executable path for command with name: \(name)"
             }
         }
     }
@@ -219,7 +226,8 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
     /// - Returns: An initialized command with the found program in
     ///            ``Command/executablePath``, or `nil`, if no program with the
     ///            given `name` could be found.
-    public static func findInPath(withName name: String) -> Command?
+    /// - Throws: ``Command/Error``
+    public static func findInPath(withName name: String) throws -> Command
     where Stdin == UnspecifiedInputSource,
           Stdout == UnspecifiedOutputDestination,
           Stderr == UnspecifiedOutputDestination {
@@ -233,7 +241,7 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
         
         guard let environmentPath =
             ProcessInfo.processInfo.environment[Self.pathVariable] else {
-            return nil
+            throw Error.missingPathVariable
         }
 
         guard let executablePath =
@@ -243,7 +251,7 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
             .first(where: {
                 FileManager.default.isExecutableFile(atPath: $0.string)
             }) else {
-            return nil
+            throw Error.cannotConstructExecutablePath(commandName: name)
         }
 
         return .init(
@@ -572,7 +580,7 @@ extension Command where Stdout == UnspecifiedOutputDestination {
     /// sulting output), while stdin is connected to `/dev/null`.
     ///
     /// - Note: This method can only be called when stdout is either still
-    ///         unspecfied or when it is piped.
+    ///         unspecified or when it is piped.
     ///
     /// - Returns: The collected output of the child process.
     public func waitForOutput() throws -> ProcessOutput {
@@ -612,7 +620,7 @@ extension Command where Stdout == UnspecifiedOutputDestination {
     /// sulting output), while stdin is connected to `/dev/null`.
     ///
     /// - Note: This method can only be called when stdout is either still
-    ///         unspecfied or when it is piped.
+    ///         unspecified or when it is piped.
     ///
     /// - Returns: The collected stdout data of the child process.
     public func waitForOutputData() throws -> Data {
@@ -629,7 +637,7 @@ extension Command where Stdout == UnspecifiedOutputDestination {
     /// sulting output), while stdin is connected to `/dev/null`.
     ///
     /// - Note: This accessor can only be called when stdout is either still
-    ///         unspecfied or when it is piped.
+    ///         unspecified or when it is piped.
     public var output: ProcessOutput {
         get async throws {
             if Stdin.self == UnspecifiedInputSource.self {
@@ -670,7 +678,7 @@ extension Command where Stdout == UnspecifiedOutputDestination {
     /// sulting output), while stdin is connected to `/dev/null`.
     ///
     /// - Note: This accessor can only be called when stdout is either still
-    ///         unspecfied or when it is piped.
+    ///         unspecified or when it is piped.
     public var outputData: Data {
         get async throws {
             try await self.output.stdoutData
@@ -724,7 +732,7 @@ extension Command where Stdout == PipeOutputDestination {
     /// sulting output), while stdin is connected to `/dev/null`.
     ///
     /// - Note: This method can only be called when stdout is either still
-    ///         unspecfied or when it is piped.
+    ///         unspecified or when it is piped.
     ///
     /// - Returns: The collected stdout data of the child process.
     public func waitForOutputData() throws -> Data {
@@ -741,7 +749,7 @@ extension Command where Stdout == PipeOutputDestination {
     /// sulting output), while stdin is connected to `/dev/null`.
     ///
     /// - Note: This accessor can only be called when stdout is either still
-    ///         unspecfied or when it is piped.
+    ///         unspecified or when it is piped.
     public var output: ProcessOutput {
         get async throws {
             if Stdin.self == UnspecifiedInputSource.self {
@@ -778,7 +786,7 @@ extension Command where Stdout == PipeOutputDestination {
     /// sulting output), while stdin is connected to `/dev/null`.
     ///
     /// - Note: This accessor can only be called when stdout is either still
-    ///         unspecfied or when it is piped.
+    ///         unspecified or when it is piped.
     public var outputData: Data {
         get async throws {
             try await self.output.stdoutData

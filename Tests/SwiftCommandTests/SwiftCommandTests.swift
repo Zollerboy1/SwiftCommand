@@ -5,10 +5,7 @@ final class SwiftCommandTests: XCTestCase {
     static let lines = ["Foo", "Bar", "Baz", "Test1", "Test2"]
 
     func testEcho() async throws {
-        guard let command = Command.findInPath(withName: "echo") else {
-            fatalError()
-        }
-
+      let command = try Command.findInPath(withName: "echo")
         let process =
             try command.addArgument(Self.lines.joined(separator: "\n"))
                        .setStdout(.pipe)
@@ -25,13 +22,13 @@ final class SwiftCommandTests: XCTestCase {
 
     func testComposition() async throws {
         let echoProcess =
-            try Command.findInPath(withName: "echo")!
+            try Command.findInPath(withName: "echo")
                        .addArgument(Self.lines.joined(separator: "\n"))
                        .setStdout(.pipe)
                        .spawn()
         
         let grepProcess =
-            try Command.findInPath(withName: "grep")!
+            try Command.findInPath(withName: "grep")
                        .addArgument("Test")
                        .setStdin(.pipe(from: echoProcess.stdout))
                        .setStdout(.pipe)
@@ -50,7 +47,7 @@ final class SwiftCommandTests: XCTestCase {
     }
     
     func testStdin() async throws {
-        let process = try Command.findInPath(withName: "cat")!
+        let process = try Command.findInPath(withName: "cat")
                                  .setStdin(.pipe)
                                  .setStdout(.pipe)
                                  .spawn()
@@ -66,7 +63,7 @@ final class SwiftCommandTests: XCTestCase {
     }
     
     func testStderr() async throws {
-        let catCommand = Command.findInPath(withName: "cat")!
+        let catCommand = try Command.findInPath(withName: "cat")
 
         let output = try await catCommand.addArgument("non_existing.txt")
                                          .setStderr(.pipe)
@@ -86,7 +83,7 @@ final class SwiftCommandTests: XCTestCase {
     }
     
     func testParallelProcesses() async throws {
-        let command = Command.findInPath(withName: "cat")!
+        let command = try Command.findInPath(withName: "cat")
                              .setStdin(.pipe(closeImplicitly: false))
                              .setStdout(.pipe)
         
@@ -126,7 +123,7 @@ final class SwiftCommandTests: XCTestCase {
     }
     
     func testTermination() async throws {
-        let command = Command.findInPath(withName: "cat")!
+        let command = try Command.findInPath(withName: "cat")
                              .setStdin(.pipe(closeImplicitly: false))
                              .setStdout(.pipe)
         
