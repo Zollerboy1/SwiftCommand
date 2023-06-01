@@ -1,9 +1,9 @@
 # SwiftCommand
 
 ![Platform: macOS/Linux/Windows\*](https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows%2A-orange)
-![Swift versions: 5.6, 5.7](https://img.shields.io/badge/swift-5.6%20%7C%205.7-blue)
+![Swift versions: 5.6, 5.7, 5.8](https://img.shields.io/badge/swift-5.6%20%7C%205.7%20%7C%205.8-blue)
 
-\*Windows support is only experimental for now.
+*\*Windows support is only experimental for now.*
 
 ---
 
