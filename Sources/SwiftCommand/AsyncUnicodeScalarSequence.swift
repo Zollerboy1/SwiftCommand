@@ -4,7 +4,7 @@ public struct AsyncUnicodeScalarSequence<Base>: AsyncSequence
 where Base: AsyncSequence, Base.Element == UInt8 {
     /// The type of element produced by this asynchronous sequence.
     public typealias Element = UnicodeScalar
-    
+
     /// The type of asynchronous iterator that produces elements of this
     /// asynchronous sequence.
     public struct AsyncIterator: AsyncIteratorProtocol {
@@ -12,39 +12,39 @@ where Base: AsyncSequence, Base.Element == UInt8 {
         internal var _base: Base.AsyncIterator
         @usableFromInline
         internal var _leftover: UInt8?
-        
+
         internal init(_base base: Base.AsyncIterator) {
             self._base = base
             self._leftover = nil
         }
-        
+
         @inlinable
         internal func _expectedContinuationCountForByte(_ byte: UInt8) -> Int? {
             if byte & 0b11100000 == 0b11000000 {
                 return 1
             }
-            
+
             if byte & 0b11110000 == 0b11100000 {
                 return 2
             }
-            
+
             if byte & 0b11111000 == 0b11110000 {
                 return 3
             }
-            
+
             if byte & 0b10000000 == 0b00000000 {
                 return 0
             }
-            
+
             if byte & 0b11000000 == 0b10000000 {
                 // is a continuation itself
                 return nil
             }
-            
+
             // is an invalid value
             return nil
         }
-        
+
         @inlinable
         internal mutating func _nextComplexScalar(_ first: UInt8) async rethrows
         -> UnicodeScalar? {
@@ -54,7 +54,7 @@ where Base: AsyncSequence, Base.Element == UInt8 {
                 // replacement character directly
                 return "\u{FFFD}"
             }
-            
+
             var bytes: (UInt8, UInt8, UInt8, UInt8) = (first, 0, 0, 0)
             var numContinuations = 0
             while numContinuations < expectedContinuationCount,
@@ -66,7 +66,7 @@ where Base: AsyncSequence, Base.Element == UInt8 {
                     self._leftover = next
                     break
                 }
-                
+
                 numContinuations += 1
                 withUnsafeMutableBytes(of: &bytes) {
                     $0[numContinuations] = next
@@ -76,7 +76,7 @@ where Base: AsyncSequence, Base.Element == UInt8 {
                 return String(decoding: $0, as: UTF8.self).unicodeScalars.first
             }
         }
-        
+
         /// Asynchronously advances to the next element and returns it, or ends
         /// the sequence if there is no next element.
         ///
@@ -93,20 +93,20 @@ where Base: AsyncSequence, Base.Element == UInt8 {
                     _onFastPath()
                     return UnicodeScalar(byte)
                 }
-                
+
                 return try await self._nextComplexScalar(byte)
             }
-            
+
             return nil
         }
     }
-    
+
     private let base: Base
-    
+
     internal init(_base base: Base) {
         self.base = base
     }
-    
+
     /// Creates the asynchronous iterator that produces elements of this
     /// asynchronous sequence.
     ///
@@ -120,7 +120,7 @@ where Base: AsyncSequence, Base.Element == UInt8 {
 extension AsyncSequence where Self.Element == UInt8 {
     /// A non-blocking sequence of `UnicodeScalar`s created by decoding the
     /// elements of `self` as utf-8.
-    public var unicodeScalars: AsyncUnicodeScalarSequence<Self> {
+    public var unicodeScalarSequence: AsyncUnicodeScalarSequence<Self> {
         AsyncUnicodeScalarSequence(_base: self)
     }
 }

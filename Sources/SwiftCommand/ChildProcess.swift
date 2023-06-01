@@ -35,7 +35,7 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
         /// An error indicating that the reason for the termination of the
         /// process is unknown.
         case unknownTerminationReason
-        
+
         public var description: String {
             switch self {
             case .couldNotDecodeOutput:
@@ -164,7 +164,7 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
             @usableFromInline
             internal typealias Base =
                 AsyncCharacterSequence<FileHandle.CustomAsyncBytes>
-            
+
             /// The type of element produced by this asynchronous sequence.
             public typealias Element = Character
 
@@ -212,7 +212,7 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
             @usableFromInline
             internal typealias Base =
                 AsyncLineSequence<FileHandle.CustomAsyncBytes>
-            
+
             /// The type of element produced by this asynchronous sequence.
             public typealias Element = String
 
@@ -225,7 +225,7 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
                 fileprivate init(_base: Base.AsyncIterator) {
                     self._base = _base
                 }
-                
+
                 /// Asynchronously advances to the next element and returns it,
                 /// or ends the sequence if there is no next element.
                 ///
@@ -242,7 +242,7 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
             fileprivate init(_base base: Base) {
                 self.base = base
             }
-            
+
             /// Creates the asynchronous iterator that produces elements of this
             /// asynchronous sequence.
             ///
@@ -252,7 +252,54 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
                 .init(_base: self.base.makeAsyncIterator())
             }
         }
-        
+
+        /// An asynchronous sequence of raw bytes, output by a child process.
+        // Should be replaced by 'some AsyncSequence<UInt8>' as soon as that is
+        // available.
+        public struct AsyncBytes: AsyncSequence {
+            @usableFromInline
+            internal typealias Base = FileHandle.CustomAsyncBytes
+
+            /// The type of element produced by this asynchronous sequence.
+            public typealias Element = UInt8
+
+            /// The type of asynchronous iterator that produces elements of this
+            /// asynchronous sequence.
+            public struct AsyncIterator: AsyncIteratorProtocol {
+                @usableFromInline
+                internal var _base: Base.AsyncIterator
+
+                fileprivate init(_base: Base.AsyncIterator) {
+                    self._base = _base
+                }
+
+                /// Asynchronously advances to the next element and returns it,
+                /// or ends the sequence if there is no next element.
+                ///
+                /// - Returns: The next element, if it exists, or `nil` to
+                ///            signal the end of the sequence.
+                @inlinable
+                public mutating func next() async throws -> UInt8? {
+                    try await self._base.next()
+                }
+            }
+
+            private let base: Base
+
+            fileprivate init(_base base: Base) {
+                self.base = base
+            }
+
+            /// Creates the asynchronous iterator that produces elements of this
+            /// asynchronous sequence.
+            ///
+            /// - Returns: An instance of the `AsyncIterator` type used to
+            ///            produce elements of the asynchronous sequence.
+            public func makeAsyncIterator() -> AsyncIterator {
+                .init(_base: self.base.makeAsyncIterator())
+            }
+        }
+
 
         internal let pipe: Pipe
 
@@ -270,7 +317,7 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
             self.pipe.fileHandleForReading.availableData
         }
 
-        
+
         /// Reads up to the specified number of bytes of data synchronously from
         /// the child process's output stream.
         ///
@@ -325,8 +372,35 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
         /// // process
         /// ```
         public var characters: AsyncCharacters {
-            .init(_base: self.pipe.fileHandleForReading.bytes.characters)
+            .init(_base:
+                self.pipe.fileHandleForReading.customBytes.characterSequence)
         }
+
+#if canImport(Darwin)
+        /// Returns the `Foundation` provided asynchronous sequence returning
+        /// the decoded characters output by the child process.
+        ///
+        /// ```swift
+        /// let process = try Command.findInPath(withName: "echo")
+        ///                          .addArgument("Foo")
+        ///                          .setStdout(.pipe)
+        ///                          .spawn()
+        ///
+        /// for try await character in process.stdout.nativeCharacters {
+        ///     print(character)
+        /// }
+        /// // Prints 'F', 'o', 'o', and '\n'
+        ///
+        /// try process.wait()
+        /// // Ensure the process is terminated before exiting the parent
+        /// // process
+        /// ```
+        @available(macOS 12.0, *)
+        public var nativeCharacters:
+            Foundation.AsyncCharacterSequence<FileHandle.AsyncBytes> {
+            self.pipe.fileHandleForReading.bytes.characters
+        }
+#endif
 
         /// Returns an asynchronous sequence returning the decoded lines output
         /// by the child process.
@@ -347,11 +421,85 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
         /// // process
         /// ```
         public var lines: AsyncLines {
-            .init(_base: self.pipe.fileHandleForReading.bytes.lines)
+            .init(_base:
+                self.pipe.fileHandleForReading.customBytes.lineSequence)
         }
+
+#if canImport(Darwin)
+        /// Returns the `Foundation` provided asynchronous sequence returning
+        /// the decoded lines output by the child process.
+        ///
+        /// ```swift
+        /// let process = try Command.findInPath(withName: "echo")
+        ///                          .addArgument("Foo")
+        ///                          .setStdout(.pipe)
+        ///                          .spawn()
+        ///
+        /// for try await line in process.stdout.nativeLines {
+        ///     print(line)
+        /// }
+        /// // Prints 'Foo' and 'Bar'
+        ///
+        /// try process.wait()
+        /// // Ensure the process is terminated before exiting the parent
+        /// // process
+        /// ```
+        @available(macOS 12.0, *)
+        public var nativeLines:
+            Foundation.AsyncLineSequence<FileHandle.AsyncBytes> {
+            self.pipe.fileHandleForReading.bytes.lines
+        }
+#endif
+
+        /// Returns an asynchronous sequence returning the raw bytes output by
+        /// the child process.
+        ///
+        /// ```swift
+        /// let process = try Command.findInPath(withName: "echo")
+        ///                          .addArgument("Foo")
+        ///                          .setStdout(.pipe)
+        ///                          .spawn()
+        ///
+        /// for try await byte in process.stdout.bytes {
+        ///     print(byte)
+        /// }
+        /// // Prints '70', '111', '111', and '10'
+        ///
+        /// try process.wait()
+        /// // Ensure the process is terminated before exiting the parent
+        /// // process
+        /// ```
+        public var bytes: AsyncBytes {
+            .init(_base: self.pipe.fileHandleForReading.customBytes)
+        }
+
+#if canImport(Darwin)
+        /// Returns the `Foundation` provided asynchronous sequence returning
+        /// the raw bytes output by the child process.
+        ///
+        /// ```swift
+        /// let process = try Command.findInPath(withName: "echo")
+        ///                          .addArgument("Foo")
+        ///                          .setStdout(.pipe)
+        ///                          .spawn()
+        ///
+        /// for try await byte in process.stdout.nativeBytes {
+        ///     print(byte)
+        /// }
+        /// // Prints '70', '111', '111', and '10'
+        ///
+        /// try process.wait()
+        /// // Ensure the process is terminated before exiting the parent
+        /// // process
+        /// ```
+        @available(macOS 12.0, *)
+        public var nativeBytes: FileHandle.AsyncBytes {
+            self.pipe.fileHandleForReading.bytes
+        }
+#endif
     }
-    
-    
+
+
     internal typealias GeneratingCommand = Command<Stdin, Stdout, Stderr>
 
     private let command: GeneratingCommand
@@ -380,7 +528,7 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
         withCommand command: GeneratingCommand
     ) throws -> ChildProcess<Stdin, Stdout, Stderr> {
         let process = Process()
-        
+
         process.executableURL = command.executablePath.url
         process.arguments = command.arguments
 
@@ -473,8 +621,8 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
     public var isRunning: Bool {
         self.process.isRunning
     }
-    
-    
+
+
     /// Checks to see if the child process has already terminated and returns
     /// the process's exit status if that's the case.
     ///
@@ -519,7 +667,7 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
     public func terminate() {
         self.process.terminate()
     }
-    
+
     /// Sends a kill signal (`SIGKILL`) to the child process. This normally
     /// means that the child process is immediately terminated, no matter what.
     ///
@@ -527,7 +675,7 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
     /// in any way.
     ///
     /// Calling this method has no effect, if the child process has already
-    /// terminated. 
+    /// terminated.
     public func kill() {
         if self.process.isRunning {
 #if canImport(WinSDK)
@@ -541,8 +689,8 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
 #endif
         }
     }
-    
-    
+
+
     /// Waits for the child process to exit completely, returning the status
     /// that it exited with.
     ///
@@ -563,7 +711,7 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
     @discardableResult
     public func wait() throws -> ExitStatus {
         try self.closePipedStdin()
-        
+
         self.process.waitUntilExit()
 
         return try self.createExitStatus().get()
@@ -588,7 +736,7 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
     public var status: ExitStatus {
         get async throws {
             try self.closePipedStdin()
-            
+
             return try await withCheckedThrowingContinuation { continuation in
                 if self.process.isRunning {
                     self.process.terminationHandler = { [weak self] _ in
@@ -628,7 +776,7 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
 #endif
         }
     }
-    
+
     private func closePipedStdin() throws {
         if self.closeStdinImplicitly {
             try self.stdinPipe!.fileHandleForWriting.close()
@@ -671,7 +819,7 @@ extension ChildProcess where Stdout == PipeOutputDestination {
     /// - Returns: The collected output of the child process.
     public func waitWithOutput() throws -> ProcessOutput {
         try self.closePipedStdin()
-        
+
         self.process.waitUntilExit()
 
         return try self.createProcessOutput().get()
@@ -696,7 +844,7 @@ extension ChildProcess where Stdout == PipeOutputDestination {
     public var output: ProcessOutput {
         get async throws {
             try self.closePipedStdin()
-            
+
             return try await withCheckedThrowingContinuation { continuation in
                 if self.process.isRunning {
                     self.process.terminationHandler = { [weak self] _ in

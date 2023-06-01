@@ -4,25 +4,25 @@ public struct AsyncLineSequence<Base>: AsyncSequence
 where Base: AsyncSequence, Base.Element == UInt8 {
     /// The type of element produced by this asynchronous sequence.
     public typealias Element = String
-    
+
     /// The type of asynchronous iterator that produces elements of this
     /// asynchronous sequence.
     public struct AsyncIterator: AsyncIteratorProtocol {
         public typealias Element = String
-        
+
         @usableFromInline
         internal var _base: Base.AsyncIterator
         @usableFromInline
         internal var _buffer: Array<UInt8>
         @usableFromInline
         internal var _leftover: UInt8?
-        
+
         internal init(_base base: Base.AsyncIterator) {
             self._base = base
             self._buffer = []
             self._leftover = nil
         }
-        
+
         /// Asynchronously advances to the next element and returns it, or ends
         /// the sequence if there is no next element.
         ///
@@ -44,31 +44,31 @@ where Base: AsyncSequence, Base.Element == UInt8 {
             let _SEPARATOR_CONTINUATION: UInt8 = 0x80
             let _SEPARATOR_SUFFIX_LINE: UInt8 = 0xA8
             let _SEPARATOR_SUFFIX_PARAGRAPH: UInt8 = 0xA9
-            
+
             func yield() -> String? {
                 defer {
                     self._buffer.removeAll(keepingCapacity: true)
                 }
-                
+
                 if self._buffer.isEmpty {
                     return nil
                 }
-                
+
                 return String(decoding: self._buffer, as: UTF8.self)
             }
-            
+
             func nextByte() async throws -> UInt8? {
                 defer {
                     self._leftover = nil
                 }
-                
+
                 if let leftover = self._leftover {
                     return leftover
                 }
-                
+
                 return try await self._base.next()
             }
-            
+
             while let first = try await nextByte() {
                 switch first {
                 case _CR:
@@ -78,21 +78,21 @@ where Base: AsyncSequence, Base.Element == UInt8 {
                         // if we ran out of bytes, the last byte was a CR
                         return result
                     }
-                    
+
                     if next != _LF {
                         self._leftover = next
                     }
-                    
+
                     if let result = result {
                         return result
                     }
-                    
+
                     continue
                 case _LF..<_CR:
                     guard let result = yield() else {
                         continue
                     }
-                    
+
                     return result
                 case _NEL_PREFIX:
                     // this may be used to compose other UTF8 characters
@@ -102,7 +102,7 @@ where Base: AsyncSequence, Base.Element == UInt8 {
                         self._buffer.append(first)
                         return yield()
                     }
-                    
+
                     if next != _NEL_SUFFIX {
                         self._buffer.append(first)
                         self._buffer.append(next)
@@ -110,7 +110,7 @@ where Base: AsyncSequence, Base.Element == UInt8 {
                         guard let result = yield() else {
                             continue
                         }
-                        
+
                         return result
                     }
                 case _SEPARATOR_PREFIX:
@@ -121,19 +121,19 @@ where Base: AsyncSequence, Base.Element == UInt8 {
                         self._buffer.append(first)
                         return yield()
                     }
-                    
+
                     guard next == _SEPARATOR_CONTINUATION else {
                         self._buffer.append(first)
                         self._buffer.append(next)
                         continue
                     }
-                    
+
                     guard let fin = try await self._base.next() else {
                         self._buffer.append(first)
                         self._buffer.append(next)
                         return yield()
                     }
-                    
+
                     guard fin == _SEPARATOR_SUFFIX_LINE
                             || fin == _SEPARATOR_SUFFIX_PARAGRAPH else {
                         self._buffer.append(first)
@@ -141,11 +141,11 @@ where Base: AsyncSequence, Base.Element == UInt8 {
                         self._buffer.append(fin)
                         continue
                     }
-                    
+
                     if let result = yield() {
                         return result
                     }
-                    
+
                     continue
                 default:
                     self._buffer.append(first)
@@ -156,18 +156,18 @@ where Base: AsyncSequence, Base.Element == UInt8 {
             if !self._buffer.isEmpty {
                 return yield()
             }
-            
+
             return nil
         }
-        
+
     }
-    
+
     private let base: Base
-    
+
     internal init(_base base: Base) {
         self.base = base
     }
-    
+
     /// Creates the asynchronous iterator that produces elements of this
     /// asynchronous sequence.
     ///
@@ -181,7 +181,7 @@ where Base: AsyncSequence, Base.Element == UInt8 {
 extension AsyncSequence where Self.Element == UInt8 {
     /// A non-blocking sequence of newline-separated `String`s created by
     /// decoding the elements of `self` as utf-8.
-    public var lines: AsyncLineSequence<Self> {
+    public var lineSequence: AsyncLineSequence<Self> {
         AsyncLineSequence(_base: self)
     }
 }

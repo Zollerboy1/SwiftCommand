@@ -4,10 +4,10 @@ public struct AsyncCharacterSequence<Base>: AsyncSequence
 where Base: AsyncSequence, Base.Element == UInt8 {
     @usableFromInline
     internal typealias Underlying = AsyncUnicodeScalarSequence<Base>
-    
+
     /// The type of element produced by this asynchronous sequence.
     public typealias Element = Character
-    
+
     /// The type of asynchronous iterator that produces elements of this
     /// asynchronous sequence.
     public struct AsyncIterator: AsyncIteratorProtocol {
@@ -15,12 +15,12 @@ where Base: AsyncSequence, Base.Element == UInt8 {
         internal var _remaining: Underlying.AsyncIterator
         @usableFromInline
         internal var _accumulator: String
-        
+
         fileprivate init(_underlying underlying: Underlying.AsyncIterator) {
             self._remaining = underlying
             self._accumulator = ""
         }
-        
+
         /// Asynchronously advances to the next element and returns it, or ends
         /// the sequence if there is no next element.
         ///
@@ -34,7 +34,7 @@ where Base: AsyncSequence, Base.Element == UInt8 {
                     return self._accumulator.removeFirst()
                 }
             }
-            
+
             if self._accumulator.count > 0 {
                 return self._accumulator.removeFirst()
             } else {
@@ -42,13 +42,13 @@ where Base: AsyncSequence, Base.Element == UInt8 {
             }
         }
     }
-    
+
     private let underlying: Underlying
-    
+
     internal init(_base base: Base) {
         self.underlying = .init(_base: base)
     }
-    
+
     /// Creates the asynchronous iterator that produces elements of this
     /// asynchronous sequence.
     ///
@@ -62,7 +62,7 @@ where Base: AsyncSequence, Base.Element == UInt8 {
 extension AsyncSequence where Self.Element == UInt8 {
     /// A non-blocking sequence of `Character`s created by decoding the
     /// elements of `self` as utf-8.
-    public var characters: AsyncCharacterSequence<Self> {
+    public var characterSequence: AsyncCharacterSequence<Self> {
         AsyncCharacterSequence(_base: self)
     }
 }
