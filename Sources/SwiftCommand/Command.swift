@@ -173,17 +173,10 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
     /// - Parameters:
     ///   - executablePath: A `FilePath`, representing the program that should
     ///                     be executed when this command is spawned.
-    /// - Throws: An ``Command/Error``, if there is no file at `executablePath`,
-    ///           or if it isn't executable.
-    public init(executablePath: FilePath) throws
+    public init(executablePath: FilePath)
     where Stdin == UnspecifiedInputSource,
           Stdout == UnspecifiedOutputDestination,
           Stderr == UnspecifiedOutputDestination {
-        guard FileManager.default
-                         .isExecutableFile(atPath: executablePath.string) else {
-            throw Error.executableNotFound(path: executablePath)
-        }
-
         self.init(
             executablePath: executablePath,
             arguments: [],
