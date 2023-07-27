@@ -61,18 +61,6 @@ import Foundation
 /// ```
 public struct Command<Stdin, Stdout, Stderr>: Equatable, Sendable
 where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
-    /// An error that can be thrown while initializing a command.
-    public enum Error: Swift.Error, CustomStringConvertible {
-        /// An error indicating that no executable exists at the given path.
-        case executableNotFound(path: FilePath)
-        
-        public var description: String {
-            switch self {
-            case let .executableNotFound(path):
-                return "There is no executable at path '\(path)'"
-            }
-        }
-    }
 
 
 #if os(Windows)
