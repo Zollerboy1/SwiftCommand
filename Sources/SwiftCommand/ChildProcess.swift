@@ -953,17 +953,23 @@ extension ChildProcess where Stdout == PipeOutputDestination,
     /// by the child process both from stdout and stderr.
     ///
     /// ```swift
-    /// let process = try Command.findInPath(withName: "echo")
-    ///                          .addArgument("Foo")
-    ///                          .setStdout(.pipe)
-    ///                          .spawn()
+    /// let echoProcess = try Command.findInPath(withName: "echo")
+    ///                              .addArguments("Foo", "Bar")
+    ///                              .setStdout(.pipe)
+    ///                              .spawn()
     ///
-    /// for try await line in process.stdout.lines {
+    /// let teeProcess = try Command.findInPath(withName: "tee")
+    ///                             .addArgument("/dev/stderr")
+    ///                             .setStdin(.pipe(from: echoProcess.stdout))
+    ///                             .setOutputs(.pipe)
+    ///                             .spawn()
+    ///
+    /// for try await line in teeProcess.mergedOutputLines {
     ///     print(line)
     /// }
-    /// // Prints 'Foo' and 'Bar'
+    /// // Prints 'Foo' and 'Bar' twice, maybe interleaved
     ///
-    /// try process.wait()
+    /// try teeProcess.wait()
     /// // Ensure the process is terminated before exiting the parent
     /// // process
     /// ```
