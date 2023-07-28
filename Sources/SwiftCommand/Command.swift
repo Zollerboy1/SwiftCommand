@@ -61,18 +61,6 @@ import Foundation
 /// ```
 public struct Command<Stdin, Stdout, Stderr>: Equatable, Sendable
 where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
-    /// An error that can be thrown while initializing a command.
-    public enum Error: Swift.Error, CustomStringConvertible {
-        /// An error indicating that no executable exists at the given path.
-        case executableNotFound(path: FilePath)
-        
-        public var description: String {
-            switch self {
-            case let .executableNotFound(path):
-                return "There is no executable at path '\(path)'"
-            }
-        }
-    }
 
 
 #if os(Windows)
@@ -173,17 +161,10 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
     /// - Parameters:
     ///   - executablePath: A `FilePath`, representing the program that should
     ///                     be executed when this command is spawned.
-    /// - Throws: An ``Command/Error``, if there is no file at `executablePath`,
-    ///           or if it isn't executable.
-    public init(executablePath: FilePath) throws
+    public init(executablePath: FilePath)
     where Stdin == UnspecifiedInputSource,
           Stdout == UnspecifiedOutputDestination,
           Stderr == UnspecifiedOutputDestination {
-        guard FileManager.default
-                         .isExecutableFile(atPath: executablePath.string) else {
-            throw Error.executableNotFound(path: executablePath)
-        }
-
         self.init(
             executablePath: executablePath,
             arguments: [],
