@@ -1,13 +1,16 @@
 import XCTest
 @testable import SwiftCommand
 
+import AsyncAlgorithms
+
 final class SwiftCommandTests: XCTestCase {
     static let lines = ["Foo", "Bar", "Baz", "Test1", "Test2"]
     static let joinedLines = lines.joined(separator: "\n")
 
     func testEcho() async throws {
         guard let command = Command.findInPath(withName: "echo") else {
-            fatalError()
+            XCTFail()
+            return
         }
 
         let process =
@@ -232,5 +235,30 @@ final class SwiftCommandTests: XCTestCase {
             try process3.wait()
         }
 #endif
+    }
+
+    func testMergedOutput() async throws {
+        let echoProcess =
+            try Command.findInPath(withName: "echo")!
+                       .addArgument(Self.joinedLines)
+                       .setStdout(.pipe)
+                       .spawn()
+
+        let bashProcess =
+            try Command.findInPath(withName: "bash")!
+                       .addArgument("-c")
+                       .addArgument("tee /dev/stderr | sed 's/.*/stdout: &/'")
+                       .setStdin(.pipe(from: echoProcess.stdout))
+                       .setOutputs(.pipe)
+                       .spawn()
+
+        let lines = try await Array(bashProcess.mergedOutputLines)
+
+        try bashProcess.wait()
+
+        for line in Self.lines {
+            XCTAssertTrue(lines.contains(line))
+            XCTAssertTrue(lines.contains("stdout: \(line)"))
+        }
     }
 }

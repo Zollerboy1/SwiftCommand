@@ -1,3 +1,4 @@
+import AsyncAlgorithms
 import Foundation
 
 #if canImport(WinSDK)
@@ -499,6 +500,53 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
 #endif
     }
 
+    public struct MergedAsyncLines: AsyncSequence {
+        @usableFromInline
+        internal typealias Base = AsyncMerge2Sequence<
+            AsyncLineSequence<FileHandle.CustomAsyncBytes>,
+            AsyncLineSequence<FileHandle.CustomAsyncBytes>
+        >
+
+        /// The type of element produced by this asynchronous sequence.
+        public typealias Element = String
+
+        /// The type of asynchronous iterator that produces elements of this
+        /// asynchronous sequence.
+        public struct AsyncIterator: AsyncIteratorProtocol {
+            @usableFromInline
+            internal var _base: Base.AsyncIterator
+
+            fileprivate init(_base: Base.AsyncIterator) {
+                self._base = _base
+            }
+
+            /// Asynchronously advances to the next element and returns it,
+            /// or ends the sequence if there is no next element.
+            ///
+            /// - Returns: The next element, if it exists, or `nil` to
+            ///            signal the end of the sequence.
+            @inlinable
+            public mutating func next() async throws -> String? {
+                try await self._base.next()
+            }
+        }
+
+        private let base: Base
+
+        fileprivate init(_base base: Base) {
+            self.base = base
+        }
+
+        /// Creates the asynchronous iterator that produces elements of this
+        /// asynchronous sequence.
+        ///
+        /// - Returns: An instance of the `AsyncIterator` type used to
+        ///            produce elements of the asynchronous sequence.
+        public func makeAsyncIterator() -> AsyncIterator {
+            .init(_base: self.base.makeAsyncIterator())
+        }
+    }
+
 
     internal typealias GeneratingCommand = Command<Stdin, Stdout, Stderr>
 
@@ -896,5 +944,35 @@ extension ChildProcess where Stderr == PipeOutputDestination {
     /// (stderr), if it is piped.
     public var stderr: OutputHandle {
         .init(pipe: self.stderrPipe!)
+    }
+}
+
+extension ChildProcess where Stdout == PipeOutputDestination,
+                             Stderr == PipeOutputDestination {
+    /// Returns an asynchronous sequence returning the decoded lines output
+    /// by the child process both from stdout and stderr.
+    ///
+    /// ```swift
+    /// let process = try Command.findInPath(withName: "echo")
+    ///                          .addArgument("Foo")
+    ///                          .setStdout(.pipe)
+    ///                          .spawn()
+    ///
+    /// for try await line in process.stdout.lines {
+    ///     print(line)
+    /// }
+    /// // Prints 'Foo' and 'Bar'
+    ///
+    /// try process.wait()
+    /// // Ensure the process is terminated before exiting the parent
+    /// // process
+    /// ```
+    public var mergedOutputLines: MergedAsyncLines {
+        .init(
+            _base: merge(
+                self.stdout.pipe.fileHandleForReading.customBytes.lineSequence,
+                self.stderr.pipe.fileHandleForReading.customBytes.lineSequence
+            )
+        )
     }
 }

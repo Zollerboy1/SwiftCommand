@@ -61,8 +61,6 @@ import Foundation
 /// ```
 public struct Command<Stdin, Stdout, Stderr>: Equatable, Sendable
 where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
-
-
 #if os(Windows)
     @inline(__always)
     private static var pathVariable: String { "Path" }
@@ -94,11 +92,11 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
     /// // Prints e.g. '/bin/echo'
     /// ```
     public let executablePath: FilePath
-    
+
     /// The list of arguments that will be passed to the program when this
     /// command is spawned.
     public let arguments: [String]
-    
+
     /// The environment dictionary that will be set for the program when this
     /// command is spawned.
     ///
@@ -106,7 +104,7 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
     /// will be merged with the environment of the parent process before the
     /// command is spawned.
     public let environment: [String: String]
-    
+
     /// Determines, if the environment of the child process inherits from the
     /// parent process's one.
     ///
@@ -120,7 +118,7 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
     /// // Command 'foo' is executed without any environment variables.
     /// ```
     public let inheritEnvironment: Bool
-    
+
     /// Determines the child process's working directory.
     ///
     /// If ``Command/cwd`` is `nil`, the working directory will not be changed.
@@ -129,7 +127,7 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
     internal let stdin: Stdin
     internal let stdout: Stdout
     internal let stderr: Stderr
-    
+
 
     private init(
         executablePath: FilePath,
@@ -211,7 +209,7 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
         } else {
             nameWithExtension = name
         }
-        
+
         guard let environmentPath =
             ProcessInfo.processInfo.environment[Self.pathVariable] else {
             return nil
@@ -280,8 +278,8 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
     public __consuming func addArgument(_ newArgument: String) -> Self {
         self.addArguments(newArgument)
     }
-    
-    
+
+
     @available(*, deprecated, renamed: "setEnvVariable")
     public __consuming func addEnvVariable(key: String, value: String) -> Self {
         self.setEnvVariable(key: key, value: value)
@@ -310,14 +308,14 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
             stderr: self.stderr
         )
     }
-    
+
     @available(*, deprecated, renamed: "setEnvVariables")
     public __consuming func addEnvVariables(
         _ newEnvVariables: [String: String]
     ) -> Self {
         self.setEnvVariables(newEnvVariables)
     }
-    
+
     /// Merges the given environment dictionary with the current environment.
     ///
     /// If there are variables with the same name, the values of the given
@@ -432,7 +430,7 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
             stderr: self.stderr
         )
     }
-    
+
     /// Sets a different destination for the child process's stdout handle.
     ///
     /// This can be used to channel the child process's output into a file, or
@@ -466,7 +464,7 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
             stderr: self.stderr
         )
     }
-    
+
     /// Sets a different destination for the child process's stderr handle.
     ///
     /// This can be used to channel the child process's error output into a
@@ -502,6 +500,44 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
         )
     }
 
+    /// Sets a different destination for the child process's stdout and stderr
+    /// handle.
+    ///
+    /// This can be used to channel the child process's output and error output
+    /// into a file, or to read it directly from the parent process:
+    ///
+    /// ```swift
+    /// let status = try await Command.findInPath(withName: "cat")!
+    ///         .addArguments("existing.txt", "non_existing.txt")
+    ///         .setOutputs(.write(toFile: "output.txt"))
+    ///         .status
+    ///
+    /// // Writes the contents of 'existing.txt' and
+    /// // 'cat: non_existing.txt: No such file or directory'
+    /// // or similar to 'output.txt'
+    ///
+    /// assert(!status.terminatedSuccessfully)
+    /// ```
+    ///
+    /// - Parameters:
+    ///   - newStderr: An ``OutputDestination``, corresponding to the method of
+    ///                error output, the child process should use.
+    /// - Returns: A new command instance with the given stderr destination set.
+    public __consuming func setOutputs<NewOutputDestination: OutputDestination>(
+        _ newOutput: NewOutputDestination
+    ) -> Command<Stdin, NewOutputDestination, NewOutputDestination> {
+        .init(
+            executablePath: self.executablePath,
+            arguments: self.arguments,
+            environment: self.environment,
+            inheritEnvironment: self.inheritEnvironment,
+            cwd: self.cwd,
+            stdin: self.stdin,
+            stdout: newOutput,
+            stderr: newOutput
+        )
+    }
+
 
     /// Executes the command as a child process, returning a handle to it.
     ///
@@ -513,7 +549,7 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
         try .spawn(withCommand: self)
     }
 
-    
+
     /// Executes the command as a child process, waits for it to complete, and
     /// returns its exit status.
     ///
@@ -527,7 +563,7 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
     public func wait() throws -> ExitStatus {
         try self.spawn().wait()
     }
-    
+
     /// Executes the command as a child process, waits for it to complete, and
     /// returns its exit status.
     ///
@@ -599,7 +635,7 @@ extension Command where Stdout == UnspecifiedOutputDestination {
     public func waitForOutputData() throws -> Data {
         try self.waitForOutput().stdoutData
     }
-    
+
     /// Executes the command as a child process, waits for it to complete, and
     /// returns its collected output.
     ///
@@ -640,7 +676,7 @@ extension Command where Stdout == UnspecifiedOutputDestination {
             }
         }
     }
-    
+
     /// Executes the command as a child process, waits for it to complete, and
     /// returns its collected stdout data.
     ///
@@ -711,7 +747,7 @@ extension Command where Stdout == PipeOutputDestination {
     public func waitForOutputData() throws -> Data {
         try self.waitForOutput().stdoutData
     }
-    
+
     /// Executes the command as a child process, waits for it to complete, and
     /// returns its collected output.
     ///
@@ -748,7 +784,7 @@ extension Command where Stdout == PipeOutputDestination {
             }
         }
     }
-    
+
     /// Executes the command as a child process, waits for it to complete, and
     /// returns its collected stdout data.
     ///
