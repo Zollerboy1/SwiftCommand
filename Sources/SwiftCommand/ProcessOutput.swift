@@ -1,9 +1,5 @@
-#if os(macOS)
 import Foundation
-#else
-@preconcurrency
-import Foundation
-#endif
+
 
 /// The output of a finished child process.
 ///
