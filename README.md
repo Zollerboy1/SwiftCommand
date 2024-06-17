@@ -1,7 +1,7 @@
 # SwiftCommand
 
-![Platform: macOS/Linux/Windows\*](https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows%2A-orange)
-![Swift versions: 5.6, 5.7, 5.8](https://img.shields.io/badge/swift-5.6%20%7C%205.7%20%7C%205.8-blue)
+![Platforms: macOS/Linux/Windows\*](https://img.shields.io/badge/Platforms-macOS%20%7C%20Linux%20%7C%20Windows%2A-F05138)
+[![Supported swift versions](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2FZollerboy1%2FSwiftCommand%2Fbadge%3Ftype%3Dswift-versions)](https://swiftpackageindex.com/Zollerboy1/SwiftCommand)
 
 *\*Windows support is only experimental for now.*
 
@@ -23,7 +23,7 @@ let package = Package(
         // other dependencies...
         .package(
             url: "https://github.com/Zollerboy1/SwiftCommand.git",
-            from: "1.2.0"
+            from: "1.4.0"
         ),
     ],
     // ...
