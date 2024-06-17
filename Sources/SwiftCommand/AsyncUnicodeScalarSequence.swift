@@ -46,10 +46,15 @@ where Base: AsyncSequence, Base.Element == UInt8 {
         }
 
         @inlinable
-        internal mutating func _nextComplexScalar(_ first: UInt8) async rethrows
-        -> UnicodeScalar? {
-            guard let expectedContinuationCount =
-                    self._expectedContinuationCountForByte(first) else {
+        internal mutating func _nextComplexScalar(
+            _ first: UInt8
+        ) async rethrows
+            -> UnicodeScalar?
+        {
+            guard
+                let expectedContinuationCount =
+                    self._expectedContinuationCountForByte(first)
+            else {
                 // We only reach here for invalid UTF8, so just return a
                 // replacement character directly
                 return "\u{FFFD}"
@@ -58,7 +63,8 @@ where Base: AsyncSequence, Base.Element == UInt8 {
             var bytes: (UInt8, UInt8, UInt8, UInt8) = (first, 0, 0, 0)
             var numContinuations = 0
             while numContinuations < expectedContinuationCount,
-                  let next = try await self._base.next() {
+                let next = try await self._base.next()
+            {
                 guard UTF8.isContinuation(next) else {
                     // We read one more byte than we needed due to an invalid
                     // missing continuation byte. Store it in `leftover` for

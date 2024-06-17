@@ -35,11 +35,11 @@ where Base: AsyncSequence, Base.Element == UInt8 {
                 }
             }
 
-            if self._accumulator.count > 0 {
-                return self._accumulator.removeFirst()
-            } else {
+            guard self._accumulator.count > 0 else {
                 return nil
             }
+
+            return self._accumulator.removeFirst()
         }
     }
 

@@ -13,7 +13,7 @@ where Base: AsyncSequence, Base.Element == UInt8 {
         @usableFromInline
         internal var _base: Base.AsyncIterator
         @usableFromInline
-        internal var _buffer: Array<UInt8>
+        internal var _buffer: [UInt8]
         @usableFromInline
         internal var _leftover: UInt8?
 
@@ -103,16 +103,16 @@ where Base: AsyncSequence, Base.Element == UInt8 {
                         return yield()
                     }
 
-                    if next != _NEL_SUFFIX {
-                        self._buffer.append(first)
-                        self._buffer.append(next)
-                    } else {
+                    guard next != _NEL_SUFFIX else {
                         guard let result = yield() else {
                             continue
                         }
 
                         return result
                     }
+
+                    self._buffer.append(first)
+                    self._buffer.append(next)
                 case _SEPARATOR_PREFIX:
                     // Try to read: 80 [A8 | A9].
                     // If we can't, then we put the byte in the buffer for
@@ -134,8 +134,10 @@ where Base: AsyncSequence, Base.Element == UInt8 {
                         return yield()
                     }
 
-                    guard fin == _SEPARATOR_SUFFIX_LINE
-                            || fin == _SEPARATOR_SUFFIX_PARAGRAPH else {
+                    guard
+                        fin == _SEPARATOR_SUFFIX_LINE
+                            || fin == _SEPARATOR_SUFFIX_PARAGRAPH
+                    else {
                         self._buffer.append(first)
                         self._buffer.append(next)
                         self._buffer.append(fin)

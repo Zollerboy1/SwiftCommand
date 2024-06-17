@@ -48,7 +48,6 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
         }
     }
 
-
     /// A handle to a child process's standard input (stdin).
     ///
     /// ``ChildProcess/InputHandle`` allows writing to the stdin of a child
@@ -82,7 +81,6 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
             self.pipe = pipe
         }
 
-
         /// Writes the given string to the child process's stdin stream.
         ///
         /// An exception is thrown if this handle has been invalidated by a call
@@ -113,7 +111,6 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
                 self.pipe.fileHandleForWriting.write(Data(data))
             }
         }
-
 
         /// Closes the child process's stdin stream, ensuring that the process
         /// does not block waiting for input from the parent anymore.
@@ -301,13 +298,11 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
             }
         }
 
-
         internal let pipe: Pipe
 
         fileprivate init(pipe: Pipe) {
             self.pipe = pipe
         }
-
 
         /// The data currently available in the child process's output stream.
         ///
@@ -317,7 +312,6 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
         public var availableData: Data {
             self.pipe.fileHandleForReading.availableData
         }
-
 
         /// Reads up to the specified number of bytes of data synchronously from
         /// the child process's output stream.
@@ -332,12 +326,12 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
         ///            number of bytes, or an empty `Data` object if the stream
         ///            is closed.
         public func read(upToCount count: Int) -> Data? {
-            if #available(macOS 10.15.4, *) {
-                return
-                    try! self.pipe.fileHandleForReading.read(upToCount: count)
-            } else {
+            guard #available(macOS 10.15.4, *) else {
                 return self.pipe.fileHandleForReading.readData(ofLength: count)
             }
+
+            return
+                try! self.pipe.fileHandleForReading.read(upToCount: count)
         }
 
         /// Reads data synchronously up to the end of file or maximum number of
@@ -346,13 +340,12 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
         /// - Returns: The data in the stream until an end-of-file indicator is
         ///            encountered.
         public func readToEnd() -> Data? {
-            if #available(macOS 10.15.4, *) {
-                return try! self.pipe.fileHandleForReading.readToEnd()
-            } else {
+            guard #available(macOS 10.15.4, *) else {
                 return self.pipe.fileHandleForReading.readDataToEndOfFile()
             }
-        }
 
+            return try! self.pipe.fileHandleForReading.readToEnd()
+        }
 
         /// Returns an asynchronous sequence returning the decoded characters
         /// output by the child process.
@@ -373,11 +366,13 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
         /// // process
         /// ```
         public var characters: AsyncCharacters {
-            .init(_base:
-                self.pipe.fileHandleForReading.customBytes.characterSequence)
+            .init(
+                _base:
+                    self.pipe.fileHandleForReading.customBytes.characterSequence
+            )
         }
 
-#if canImport(Darwin)
+        #if canImport(Darwin)
         /// Returns the `Foundation` provided asynchronous sequence returning
         /// the decoded characters output by the child process.
         ///
@@ -398,10 +393,11 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
         /// ```
         @available(macOS 12.0, *)
         public var nativeCharacters:
-            Foundation.AsyncCharacterSequence<FileHandle.AsyncBytes> {
+            Foundation.AsyncCharacterSequence<FileHandle.AsyncBytes>
+        {
             self.pipe.fileHandleForReading.bytes.characters
         }
-#endif
+        #endif
 
         /// Returns an asynchronous sequence returning the decoded lines output
         /// by the child process.
@@ -422,11 +418,12 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
         /// // process
         /// ```
         public var lines: AsyncLines {
-            .init(_base:
-                self.pipe.fileHandleForReading.customBytes.lineSequence)
+            .init(
+                _base: self.pipe.fileHandleForReading.customBytes.lineSequence
+            )
         }
 
-#if canImport(Darwin)
+        #if canImport(Darwin)
         /// Returns the `Foundation` provided asynchronous sequence returning
         /// the decoded lines output by the child process.
         ///
@@ -447,10 +444,11 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
         /// ```
         @available(macOS 12.0, *)
         public var nativeLines:
-            Foundation.AsyncLineSequence<FileHandle.AsyncBytes> {
+            Foundation.AsyncLineSequence<FileHandle.AsyncBytes>
+        {
             self.pipe.fileHandleForReading.bytes.lines
         }
-#endif
+        #endif
 
         /// Returns an asynchronous sequence returning the raw bytes output by
         /// the child process.
@@ -474,7 +472,7 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
             .init(_base: self.pipe.fileHandleForReading.customBytes)
         }
 
-#if canImport(Darwin)
+        #if canImport(Darwin)
         /// Returns the `Foundation` provided asynchronous sequence returning
         /// the raw bytes output by the child process.
         ///
@@ -497,7 +495,7 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
         public var nativeBytes: FileHandle.AsyncBytes {
             self.pipe.fileHandleForReading.bytes
         }
-#endif
+        #endif
     }
 
     public struct MergedAsyncLines: AsyncSequence {
@@ -547,7 +545,6 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
         }
     }
 
-
     internal typealias GeneratingCommand = Command<Stdin, Stdout, Stderr>
 
     private let command: GeneratingCommand
@@ -571,7 +568,6 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
         self.closeStdinImplicitly = closeStdinImplicitly
     }
 
-
     internal static func spawn(
         withCommand command: GeneratingCommand
     ) throws -> ChildProcess<Stdin, Stdout, Stderr> {
@@ -583,8 +579,8 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
         let environment: [String: String]
         if command.inheritEnvironment {
             environment = ProcessInfo.processInfo
-                                     .environment
-                                     .merging(command.environment) { $1 }
+                .environment
+                .merging(command.environment) { $1 }
         } else {
             environment = command.environment
         }
@@ -594,7 +590,6 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
         if let cwd = command.cwd {
             process.currentDirectoryURL = cwd.url
         }
-
 
         let stdinPipe: Pipe?
         let closeStdinImplicitly: Bool
@@ -614,7 +609,6 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
             }
         }
 
-
         let stdoutPipe: Pipe?
         switch command.stdout {
         case is PipeOutputDestination:
@@ -629,7 +623,6 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
                 process.standardOutput = pipe
             }
         }
-
 
         let stderrPipe: Pipe?
         switch command.stderr {
@@ -646,7 +639,6 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
             }
         }
 
-
         try process.run()
 
         return .init(
@@ -659,7 +651,6 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
         )
     }
 
-
     /// The pid of the child process.
     public var identifier: Int32 {
         self.process.processIdentifier
@@ -669,7 +660,6 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
     public var isRunning: Bool {
         self.process.isRunning
     }
-
 
     /// Checks to see if the child process has already terminated and returns
     /// the process's exit status if that's the case.
@@ -687,14 +677,13 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
     /// the process's exit status if that's the case.
     public var statusIfAvailable: ExitStatus? {
         get throws {
-            if self.process.isRunning {
-                return nil
-            } else {
+            guard self.process.isRunning else {
                 return try self.createExitStatus().get()
             }
+
+            return nil
         }
     }
-
 
     /// Sends an interrupt signal (`SIGINT`) to the child process. This means
     /// that the child process is terminated, if it isn't intentionally ignoring
@@ -726,18 +715,17 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
     /// terminated.
     public func kill() {
         if self.process.isRunning {
-#if canImport(WinSDK)
+            #if canImport(WinSDK)
             WinSDK.TerminateProcess(self.process.processHandle, 1)
-#elseif canImport(Darwin)
+            #elseif canImport(Darwin)
             Darwin.kill(self.process.processIdentifier, SIGKILL)
-#elseif canImport(Glibc)
+            #elseif canImport(Glibc)
             Glibc.kill(self.process.processIdentifier, SIGKILL)
-#else
-#error("Unsupported platform!")
-#endif
+            #else
+            #error("Unsupported platform!")
+            #endif
         }
     }
-
 
     /// Waits for the child process to exit completely, returning the status
     /// that it exited with.
@@ -801,27 +789,26 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
         }
     }
 
-
     private func createExitStatus() -> Result<ExitStatus, Error> {
         switch self.process.terminationReason {
         case .exit:
             let status = self.process.terminationStatus
-            if status == 0 {
-                return .success(.success)
-            } else {
+            guard status == 0 else {
                 return .success(.error(exitCode: status))
             }
+
+            return .success(.success)
         case .uncaughtSignal:
-#if os(Windows)
+            #if os(Windows)
             return .success(.terminatedBySignal)
-#else
+            #else
             let signal = self.process.terminationStatus
             return .success(.terminatedBySignal(signal: signal))
-#endif
-#if canImport(Darwin)
+            #endif
+        #if canImport(Darwin)
         @unknown default:
             return .failure(Error.unknownTerminationReason)
-#endif
+        #endif
         }
     }
 
@@ -846,7 +833,6 @@ extension ChildProcess where Stdout == PipeOutputDestination {
     public var stdout: OutputHandle {
         .init(pipe: self.stdoutPipe!)
     }
-
 
     /// Simultaneously waits for the child process to exit and collects all
     /// remaining output on the stdout/stderr handles, returning a
@@ -914,27 +900,33 @@ extension ChildProcess where Stdout == PipeOutputDestination {
         self.createExitStatus()
             .flatMap { status in
                 let stdoutData = self.stdoutPipe!.fileHandleForReading
-                                                 .availableData
-                guard let stdout = String(
-                    data: stdoutData,
-                    encoding: .utf8
-                ) else {
+                    .availableData
+                guard
+                    let stdout = String(
+                        data: stdoutData,
+                        encoding: .utf8
+                    )
+                else {
                     return .failure(Error.couldNotDecodeOutput)
                 }
 
-                let stderrData = self.stderrPipe?.fileHandleForReading
-                                                 .availableData
+                let stderrData = self
+                    .stderrPipe?
+                    .fileHandleForReading
+                    .availableData
                 let stderr = stderrData.flatMap {
                     String(data: $0, encoding: .utf8)
                 }
 
-                return .success(.init(
-                    status: status,
-                    stdoutData: stdoutData,
-                    stdout: stdout,
-                    stderrData: stderrData,
-                    stderr: stderr
-                ))
+                return .success(
+                    .init(
+                        status: status,
+                        stdoutData: stdoutData,
+                        stdout: stdout,
+                        stderrData: stderrData,
+                        stderr: stderr
+                    )
+                )
             }
     }
 }
@@ -947,8 +939,11 @@ extension ChildProcess where Stderr == PipeOutputDestination {
     }
 }
 
-extension ChildProcess where Stdout == PipeOutputDestination,
-                             Stderr == PipeOutputDestination {
+extension ChildProcess
+where
+    Stdout == PipeOutputDestination,
+    Stderr == PipeOutputDestination
+{
     /// Returns an asynchronous sequence returning the decoded lines output
     /// by the child process both from stdout and stderr.
     ///

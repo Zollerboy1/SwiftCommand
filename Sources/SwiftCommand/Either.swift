@@ -19,62 +19,55 @@ public enum Either<First, Second> {
     public init(second: Second) {
         self = .second(second)
     }
-    
+
     /// Returns `true` if the value is the ``Either/first(_:)`` case.
     public var isFirst: Bool {
-        if case .first = self {
-            return true
-        } else {
+        guard case .first = self else {
             return false
         }
+        return true
     }
 
     /// Converts the first case of `Either<F, S>` to `F?`.
     public var first: First? {
-        if case let .first(first) = self {
-            return first
-        } else {
+        guard case .first(let first) = self else {
             return nil
         }
+        return first
     }
-    
+
     /// Returns `true` if the value is the ``Either/second(_:)`` case.
     public var isSecond: Bool {
-        if case .second = self {
-            return true
-        } else {
+        guard case .second = self else {
             return false
         }
+        return true
     }
 
     /// Converts the second case of `Either<F, S>` to `S?`.
     public var second: Second? {
-        if case let .second(second) = self {
-            return second
-        } else {
+        guard case .second(let second) = self else {
             return nil
         }
+        return second
     }
-    
-    
+
     /// Converts `Either<F, S>` to `Either<S, F>`.
     public var flipped: Either<Second, First> {
         switch self {
-        case let .first(first):
+        case .first(let first):
             return .second(first)
-        case let .second(second):
+        case .second(let second):
             return .first(second)
         }
     }
-    
-    
+
     /// Applies the closure `transformFirst` to the value in case
     /// ``Either/first(_:)`` if it is present rewrapping the result in
     /// ``Either/first(_:)``.
     ///
-    /// - Parameters:
-    ///   - transformFirst: A closure transforming a value of type `First` into
-    ///                     a value of type `NewFirst`.
+    /// - Parameter transformFirst: A closure transforming a value of type
+    ///                             `First` into a value of type `NewFirst`.
     /// - Returns: A new instance of ``Either``, containing either the result
     ///            of the `transformFirst` closure or the value in case
     ///            ``Either/second(_:)``.
@@ -82,20 +75,19 @@ public enum Either<First, Second> {
         _ transformFirst: (First) throws -> NewFirst
     ) rethrows -> Either<NewFirst, Second> {
         switch self {
-        case let .first(first):
+        case .first(let first):
             return .first(try transformFirst(first))
-        case let .second(second):
+        case .second(let second):
             return .second(second)
         }
     }
-    
+
     /// Applies the closure `transformSecond` to the value in case
     /// ``Either/second(_:)`` if it is present rewrapping the result in
     /// ``Either/second(_:)``.
     ///
-    /// - Parameters:
-    ///   - transformSecond: A closure transforming a value of type `Second`
-    ///                      into a value of type `NewSecond`.
+    /// - Parameter transformSecond: A closure transforming a value of type
+    ///                              `Second` into a value of type `NewSecond`.
     /// - Returns: A new instance of ``Either``, containing either the value in
     ///            case ``Either/first(_:)`` or the result of the
     ///            `transformSecond` closure.
@@ -103,9 +95,9 @@ public enum Either<First, Second> {
         _ transformSecond: (Second) throws -> NewSecond
     ) rethrows -> Either<First, NewSecond> {
         switch self {
-        case let .first(first):
+        case .first(let first):
             return .first(first)
-        case let .second(second):
+        case .second(let second):
             return .second(try transformSecond(second))
         }
     }

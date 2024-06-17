@@ -61,22 +61,21 @@ import Foundation
 /// ```
 public struct Command<Stdin, Stdout, Stderr>: Equatable, Sendable
 where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
-#if os(Windows)
+    #if os(Windows)
     @inline(__always)
     private static var pathVariable: String { "Path" }
     @inline(__always)
     private static var pathSeparator: Character { ";" }
     @inline(__always)
     private static var executableExtension: String { ".exe" }
-#else
+    #else
     @inline(__always)
     private static var pathVariable: String { "PATH" }
     @inline(__always)
     private static var pathSeparator: Character { ":" }
     @inline(__always)
     private static var executableExtension: String { "" }
-#endif
-
+    #endif
 
     /// The path of the executable file that will be invoked when this command
     /// is spawned.
@@ -128,7 +127,6 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
     internal let stdout: Stdout
     internal let stderr: Stderr
 
-
     private init(
         executablePath: FilePath,
         arguments: [String],
@@ -160,9 +158,11 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
     ///   - executablePath: A `FilePath`, representing the program that should
     ///                     be executed when this command is spawned.
     public init(executablePath: FilePath)
-    where Stdin == UnspecifiedInputSource,
-          Stdout == UnspecifiedOutputDestination,
-          Stderr == UnspecifiedOutputDestination {
+    where
+        Stdin == UnspecifiedInputSource,
+        Stdout == UnspecifiedOutputDestination,
+        Stderr == UnspecifiedOutputDestination
+    {
         self.init(
             executablePath: executablePath,
             arguments: [],
@@ -199,29 +199,36 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
     ///            ``Command/executablePath``, or `nil`, if no program with the
     ///            given `name` could be found.
     public static func findInPath(withName name: String) -> Command?
-    where Stdin == UnspecifiedInputSource,
-          Stdout == UnspecifiedOutputDestination,
-          Stderr == UnspecifiedOutputDestination {
+    where
+        Stdin == UnspecifiedInputSource,
+        Stdout == UnspecifiedOutputDestination,
+        Stderr == UnspecifiedOutputDestination
+    {
         let nameWithExtension: String
         if !Self.executableExtension.isEmpty
-            && !name.hasSuffix(Self.executableExtension) {
+            && !name.hasSuffix(Self.executableExtension)
+        {
             nameWithExtension = name + Self.executableExtension
         } else {
             nameWithExtension = name
         }
 
-        guard let environmentPath =
-            ProcessInfo.processInfo.environment[Self.pathVariable] else {
+        guard
+            let environmentPath =
+                ProcessInfo.processInfo.environment[Self.pathVariable]
+        else {
             return nil
         }
 
-        guard let executablePath =
-            environmentPath.split(separator: Self.pathSeparator).lazy
-            .compactMap(FilePath.init(substring:))
-            .map({ $0.appending(nameWithExtension) })
-            .first(where: {
-                FileManager.default.isExecutableFile(atPath: $0.string)
-            }) else {
+        guard
+            let executablePath =
+                environmentPath.split(separator: Self.pathSeparator).lazy
+                .compactMap(FilePath.init(substring:))
+                .map({ $0.appending(nameWithExtension) })
+                .first(where: {
+                    FileManager.default.isExecutableFile(atPath: $0.string)
+                })
+        else {
             return nil
         }
 
@@ -236,7 +243,6 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
             stderr: .init()
         )
     }
-
 
     /// Adds the provided list of arguments in order to the end of the current
     /// argument list.
@@ -278,7 +284,6 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
     public __consuming func addArgument(_ newArgument: String) -> Self {
         self.addArguments(newArgument)
     }
-
 
     @available(*, deprecated, renamed: "setEnvVariable")
     public __consuming func addEnvVariable(key: String, value: String) -> Self {
@@ -368,7 +373,6 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
         )
     }
 
-
     /// Sets the working directory of the child process to the given path.
     ///
     /// - Parameters:
@@ -387,7 +391,6 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
             stderr: self.stderr
         )
     }
-
 
     /// Sets a different source for the child process's stdin handle.
     ///
@@ -538,7 +541,6 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
         )
     }
 
-
     /// Executes the command as a child process, returning a handle to it.
     ///
     /// By default, stdin, stdout, and stderr are inherited from the parent
@@ -548,7 +550,6 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
     public func spawn() throws -> ChildProcess<Stdin, Stdout, Stderr> {
         try .spawn(withCommand: self)
     }
-
 
     /// Executes the command as a child process, waits for it to complete, and
     /// returns its exit status.
@@ -593,31 +594,33 @@ extension Command where Stdout == UnspecifiedOutputDestination {
     ///
     /// - Returns: The collected output of the child process.
     public func waitForOutput() throws -> ProcessOutput {
-        if Stdin.self == UnspecifiedInputSource.self {
-            if Stderr.self == UnspecifiedInputSource.self {
-                return try self.setStdin(.null)
-                               .setStdout(.pipe)
-                               .setStderr(.pipe)
-                               .spawn()
-                               .waitWithOutput()
-            } else {
-                return try self.setStdin(.null)
-                               .setStdout(.pipe)
-                               .spawn()
-                               .waitWithOutput()
-            }
-        } else {
-            if Stderr.self == UnspecifiedInputSource.self {
+        guard Stdin.self == UnspecifiedInputSource.self else {
+            guard Stderr.self == UnspecifiedInputSource.self else {
                 return try self.setStdout(.pipe)
-                               .setStderr(.pipe)
-                               .spawn()
-                               .waitWithOutput()
-            } else {
-                return try self.setStdout(.pipe)
-                               .spawn()
-                               .waitWithOutput()
+                    .spawn()
+                    .waitWithOutput()
             }
+
+            return try self.setStdout(.pipe)
+                .setStderr(.pipe)
+                .spawn()
+                .waitWithOutput()
         }
+
+        guard Stderr.self == UnspecifiedInputSource.self else {
+            return
+                try self
+                .setStdin(.null)
+                .setStdout(.pipe)
+                .spawn()
+                .waitWithOutput()
+        }
+
+        return try self.setStdin(.null)
+            .setStdout(.pipe)
+            .setStderr(.pipe)
+            .spawn()
+            .waitWithOutput()
     }
 
     /// Executes the command as a child process, waits for it to complete, and
@@ -649,31 +652,28 @@ extension Command where Stdout == UnspecifiedOutputDestination {
     ///         unspecfied or when it is piped.
     public var output: ProcessOutput {
         get async throws {
-            if Stdin.self == UnspecifiedInputSource.self {
-                if Stderr.self == UnspecifiedInputSource.self {
-                    return try await self.setStdin(.null)
-                                         .setStdout(.pipe)
-                                         .setStderr(.pipe)
-                                         .spawn()
-                                         .output
-                } else {
-                    return try await self.setStdin(.null)
-                                         .setStdout(.pipe)
-                                         .spawn()
-                                         .output
-                }
-            } else {
-                if Stderr.self == UnspecifiedInputSource.self {
+            guard Stdin.self == UnspecifiedInputSource.self else {
+                guard Stderr.self == UnspecifiedInputSource.self else {
                     return try await self.setStdout(.pipe)
-                                         .setStderr(.pipe)
-                                         .spawn()
-                                         .output
-                } else {
-                    return try await self.setStdout(.pipe)
-                                         .spawn()
-                                         .output
+                        .spawn()
+                        .output
                 }
+                return try await self.setStdout(.pipe)
+                    .setStderr(.pipe)
+                    .spawn()
+                    .output
             }
+            guard Stderr.self == UnspecifiedInputSource.self else {
+                return try await self.setStdin(.null)
+                    .setStdout(.pipe)
+                    .spawn()
+                    .output
+            }
+            return try await self.setStdin(.null)
+                .setStdout(.pipe)
+                .setStderr(.pipe)
+                .spawn()
+                .output
         }
     }
 
@@ -709,27 +709,24 @@ extension Command where Stdout == PipeOutputDestination {
     ///
     /// - Returns: The collected output of the child process.
     public func waitForOutput() throws -> ProcessOutput {
-        if Stdin.self == UnspecifiedInputSource.self {
-            if Stderr.self == UnspecifiedInputSource.self {
-                return try self.setStdin(.null)
-                               .setStderr(.pipe)
-                               .spawn()
-                               .waitWithOutput()
-            } else {
-                return try self.setStdin(.null)
-                               .spawn()
-                               .waitWithOutput()
-            }
-        } else {
-            if Stderr.self == UnspecifiedInputSource.self {
-                return try self.setStderr(.pipe)
-                               .spawn()
-                               .waitWithOutput()
-            } else {
+        guard Stdin.self == UnspecifiedInputSource.self else {
+            guard Stderr.self == UnspecifiedInputSource.self else {
                 return try self.spawn()
-                               .waitWithOutput()
+                    .waitWithOutput()
             }
+            return try self.setStderr(.pipe)
+                .spawn()
+                .waitWithOutput()
         }
+        guard Stderr.self == UnspecifiedInputSource.self else {
+            return try self.setStdin(.null)
+                .spawn()
+                .waitWithOutput()
+        }
+        return try self.setStdin(.null)
+            .setStderr(.pipe)
+            .spawn()
+            .waitWithOutput()
     }
 
     /// Executes the command as a child process, waits for it to complete, and
@@ -761,27 +758,24 @@ extension Command where Stdout == PipeOutputDestination {
     ///         unspecfied or when it is piped.
     public var output: ProcessOutput {
         get async throws {
-            if Stdin.self == UnspecifiedInputSource.self {
-                if Stderr.self == UnspecifiedInputSource.self {
-                    return try await self.setStdin(.null)
-                                         .setStderr(.pipe)
-                                         .spawn()
-                                         .output
-                } else {
-                    return try await self.setStdin(.null)
-                                         .spawn()
-                                         .output
-                }
-            } else {
-                if Stderr.self == UnspecifiedInputSource.self {
-                    return try await self.setStderr(.pipe)
-                                         .spawn()
-                                         .output
-                } else {
+            guard Stdin.self == UnspecifiedInputSource.self else {
+                guard Stderr.self == UnspecifiedInputSource.self else {
                     return try await self.spawn()
-                                         .output
+                        .output
                 }
+                return try await self.setStderr(.pipe)
+                    .spawn()
+                    .output
             }
+            guard Stderr.self == UnspecifiedInputSource.self else {
+                return try await self.setStdin(.null)
+                    .spawn()
+                    .output
+            }
+            return try await self.setStdin(.null)
+                .setStderr(.pipe)
+                .spawn()
+                .output
         }
     }
 
