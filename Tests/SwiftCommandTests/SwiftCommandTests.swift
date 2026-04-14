@@ -1,63 +1,66 @@
-import XCTest
+import AsyncAlgorithms
+import Foundation
+import Testing
+
 @testable import SwiftCommand
 
-import AsyncAlgorithms
-
-final class SwiftCommandTests: XCTestCase {
+struct SwiftCommandTests {
     static let lines = ["Foo", "Bar", "Baz", "Test1", "Test2"]
     static let joinedLines = lines.joined(separator: "\n")
 
-    func testEcho() async throws {
+    @Test func testEcho() async throws {
         guard let command = Command.findInPath(withName: "echo") else {
-            XCTFail()
+            Issue.record("echo not found in PATH")
             return
         }
 
         let process =
             try command.addArgument(Self.joinedLines)
-                       .setStdout(.pipe)
-                       .spawn()
+            .setStdout(.pipe)
+            .spawn()
 
         var linesIterator = Self.lines.makeIterator()
 
         for try await line in process.stdout.lines {
-            XCTAssertEqual(line, linesIterator.next())
+            #expect(line == linesIterator.next())
         }
 
         try process.wait()
     }
 
-    func testComposition() async throws {
+    @Test func testComposition() async throws {
         let echoProcess =
             try Command.findInPath(withName: "echo")!
-                       .addArgument(Self.joinedLines)
-                       .setStdout(.pipe)
-                       .spawn()
+            .addArgument(Self.joinedLines)
+            .setStdout(.pipe)
+            .spawn()
 
         let grepProcess =
             try Command.findInPath(withName: "grep")!
-                       .addArgument("Test")
-                       .setStdin(.pipe(from: echoProcess.stdout))
-                       .setStdout(.pipe)
-                       .spawn()
+            .addArgument("Test")
+            .setStdin(.pipe(from: echoProcess.stdout))
+            .setStdout(.pipe)
+            .spawn()
 
-        var linesIterator = Self.lines.filter({
-            $0.contains("Test")
-        }).makeIterator()
+        var linesIterator = Self.lines
+            .filter({
+                $0.contains("Test")
+            })
+            .makeIterator()
 
         for try await line in grepProcess.stdout.lines {
-            XCTAssertEqual(line, linesIterator.next())
+            #expect(line == linesIterator.next())
         }
 
         try echoProcess.wait()
         try grepProcess.wait()
     }
 
-    func testStdin() async throws {
+    @Test func testStdin() async throws {
         let process = try Command.findInPath(withName: "cat")!
-                                 .setStdin(.pipe)
-                                 .setStdout(.pipe)
-                                 .spawn()
+            .setStdin(.pipe)
+            .setStdout(.pipe)
+            .spawn()
 
         var stdin = process.stdin
 
@@ -66,40 +69,39 @@ final class SwiftCommandTests: XCTestCase {
 
         let output = try await process.output
 
-        XCTAssertEqual(output.stdout, "Foo\nBar\n")
+        #expect(output.stdout == "Foo\nBar\n")
     }
 
-    func testStderr() async throws {
+    @Test func testStderr() async throws {
         let catCommand = Command.findInPath(withName: "cat")!
 
         let output = try await catCommand.addArgument("non_existing.txt")
-                                         .setStderr(.pipe)
-                                         .output
+            .setStderr(.pipe)
+            .output
 
-        XCTAssertNotEqual(output.status, .success)
+        #expect(output.status != .success)
 
-        let stderr = output.stderr?.replacingOccurrences(
-            of: catCommand.executablePath.string,
-            with: "cat"
-        )
+        let stderr = output.stderr?
+            .replacingOccurrences(
+                of: catCommand.executablePath.string,
+                with: "cat"
+            )
 
-        XCTAssertEqual(
-            stderr,
-            "cat: non_existing.txt: No such file or directory\n"
-        )
+        #expect(stderr == "cat: non_existing.txt: No such file or directory\n")
     }
 
-    func testParallelProcesses() async throws {
+    @Test func testParallelProcesses() async throws {
         let command = Command.findInPath(withName: "cat")!
-                             .setStdin(.pipe(closeImplicitly: false))
-                             .setStdout(.pipe)
+            .setStdin(.pipe(closeImplicitly: false))
+            .setStdout(.pipe)
 
         try await withThrowingTaskGroup(
             of: ChildProcess<
                 PipeInputSource,
                 PipeOutputDestination,
                 UnspecifiedOutputDestination
-            >.self
+            >
+            .self
         ) {
             group in
             for _ in 0..<10 {
@@ -124,68 +126,66 @@ final class SwiftCommandTests: XCTestCase {
             for try await process in group {
                 let output = try await process.output
 
-                XCTAssertEqual(output.stdout, Self.lines.joined())
+                #expect(output.stdout == Self.lines.joined())
             }
         }
     }
 
-    func testTermination() async throws {
+    @Test func testTermination() async throws {
         let command = Command.findInPath(withName: "cat")!
-                             .setStdin(.pipe(closeImplicitly: false))
-                             .setStdout(.pipe)
+            .setStdin(.pipe(closeImplicitly: false))
+            .setStdout(.pipe)
 
         // For some strange reasons, 'cat' doesn't respond to SIGINT and SIGTERM
         // on linux, while testing. This code works in a normal executable
         // though, so I'm just ignoring it here for now...
-#if canImport(Darwin)
+        #if canImport(Darwin)
         let process1 = try command.spawn()
         let process2 = try command.spawn()
-#endif
+        #endif
         let process3 = try command.spawn()
 
-#if canImport(Darwin)
+        #if canImport(Darwin)
         process1.interrupt()
         let status1 = try await process1.status
-        XCTAssertTrue(status1.wasTerminatedBySignal)
-        XCTAssertEqual(status1.terminationSignal, SIGINT)
+        #expect(status1.wasTerminatedBySignal)
+        #expect(status1.terminationSignal == SIGINT)
 
         process2.terminate()
         let status2 = try await process2.status
-        XCTAssertTrue(status2.wasTerminatedBySignal)
-        XCTAssertEqual(status2.terminationSignal, SIGTERM)
-#endif
+        #expect(status2.wasTerminatedBySignal)
+        #expect(status2.terminationSignal == SIGTERM)
+        #endif
 
         process3.kill()
         let status3 = try await process3.status
-        XCTAssertTrue(status3.wasTerminatedBySignal)
-        XCTAssertEqual(status3.terminationSignal, SIGKILL)
+        #expect(status3.wasTerminatedBySignal)
+        #expect(status3.terminationSignal == SIGKILL)
     }
 
-    func testAsyncSequences() async throws {
+    @Test func testAsyncSequences() async throws {
         let command = Command.findInPath(withName: "echo")!
-                             .addArgument(Self.joinedLines)
-                             .setStdout(.pipe)
+            .addArgument(Self.joinedLines)
+            .setStdout(.pipe)
 
         let outputString = Self.joinedLines + "\n"
-
 
         let process1 = try command.spawn()
 
         var charactersIterator = outputString.makeIterator()
 
         for try await char in process1.stdout.characters {
-            XCTAssertEqual(char, charactersIterator.next())
+            #expect(char == charactersIterator.next())
         }
 
         try process1.wait()
-
 
         let process2 = try command.spawn()
 
         var linesIterator = Self.lines.makeIterator()
 
         for try await line in process2.stdout.lines {
-            XCTAssertEqual(line, linesIterator.next())
+            #expect(line == linesIterator.next())
         }
 
         try process2.wait()
@@ -195,31 +195,29 @@ final class SwiftCommandTests: XCTestCase {
         var bytesIterator = outputString.utf8.makeIterator()
 
         for try await byte in process3.stdout.bytes {
-            XCTAssertEqual(byte, bytesIterator.next())
+            #expect(byte == bytesIterator.next())
         }
 
         try process3.wait()
 
-
-#if canImport(Darwin)
+        #if canImport(Darwin)
         if #available(macOS 12, *) {
             let process1 = try command.spawn()
 
             var charactersIterator = outputString.makeIterator()
 
             for try await char in process1.stdout.nativeCharacters {
-                XCTAssertEqual(char, charactersIterator.next())
+                #expect(char == charactersIterator.next())
             }
 
             try process1.wait()
-
 
             let process2 = try command.spawn()
 
             var linesIterator = Self.lines.makeIterator()
 
             for try await line in process2.stdout.nativeLines {
-                XCTAssertEqual(line, linesIterator.next())
+                #expect(line == linesIterator.next())
             }
 
             try process2.wait()
@@ -229,36 +227,36 @@ final class SwiftCommandTests: XCTestCase {
             var bytesIterator = outputString.utf8.makeIterator()
 
             for try await byte in process3.stdout.nativeBytes {
-                XCTAssertEqual(byte, bytesIterator.next())
+                #expect(byte == bytesIterator.next())
             }
 
             try process3.wait()
         }
-#endif
+        #endif
     }
 
-    func testMergedOutput() async throws {
+    @Test func testMergedOutput() async throws {
         let echoProcess =
             try Command.findInPath(withName: "echo")!
-                       .addArgument(Self.joinedLines)
-                       .setStdout(.pipe)
-                       .spawn()
+            .addArgument(Self.joinedLines)
+            .setStdout(.pipe)
+            .spawn()
 
         let bashProcess =
             try Command.findInPath(withName: "bash")!
-                       .addArgument("-c")
-                       .addArgument("tee /dev/stderr | sed 's/.*/stdout: &/'")
-                       .setStdin(.pipe(from: echoProcess.stdout))
-                       .setOutputs(.pipe)
-                       .spawn()
+            .addArgument("-c")
+            .addArgument("tee /dev/stderr | sed 's/.*/stdout: &/'")
+            .setStdin(.pipe(from: echoProcess.stdout))
+            .setOutputs(.pipe)
+            .spawn()
 
         let lines = try await Array(bashProcess.mergedOutputLines)
 
         try bashProcess.wait()
 
         for line in Self.lines {
-            XCTAssertTrue(lines.contains(line))
-            XCTAssertTrue(lines.contains("stdout: \(line)"))
+            #expect(lines.contains(line))
+            #expect(lines.contains("stdout: \(line)"))
         }
     }
 }
