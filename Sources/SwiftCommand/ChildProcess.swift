@@ -602,9 +602,9 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
             stdinPipe = nil
             closeStdinImplicitly = false
             switch try stdin.processInput {
-            case let .first(fileHandle):
+            case .first(let fileHandle):
                 process.standardInput = fileHandle
-            case let .second(pipe):
+            case .second(let pipe):
                 process.standardInput = pipe
             }
         }
@@ -617,9 +617,9 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
         case let stdout:
             stdoutPipe = nil
             switch try stdout.processOutput(forType: .stdout) {
-            case let .first(fileHandle):
+            case .first(let fileHandle):
                 process.standardOutput = fileHandle
-            case let .second(pipe):
+            case .second(let pipe):
                 process.standardOutput = pipe
             }
         }
@@ -632,9 +632,9 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
         case let stderr:
             stderrPipe = nil
             switch try stderr.processOutput(forType: .stderr) {
-            case let .first(fileHandle):
+            case .first(let fileHandle):
                 process.standardError = fileHandle
-            case let .second(pipe):
+            case .second(let pipe):
                 process.standardError = pipe
             }
         }
@@ -721,6 +721,8 @@ where Stdin: InputSource, Stdout: OutputDestination, Stderr: OutputDestination {
             Darwin.kill(self.process.processIdentifier, SIGKILL)
             #elseif canImport(Glibc)
             Glibc.kill(self.process.processIdentifier, SIGKILL)
+            #elseif canImport(Musl)
+            Musl.kill(self.process.processIdentifier, SIGKILL)
             #else
             #error("Unsupported platform!")
             #endif

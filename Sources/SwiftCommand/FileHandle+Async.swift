@@ -19,6 +19,8 @@ fileprivate final actor IOActor {
             let read = Darwin.read
             #elseif canImport(Glibc)
             let read = Glibc.read
+            #elseif canImport(Musl)
+            let read = Musl.read
             #else
             #error("Unsupported platform!")
             #endif
